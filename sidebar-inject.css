@@ -1,0 +1,40 @@
+/* Injected into page — hosts the sidebar iframe */
+.autoform-sidebar-container {
+  position: fixed;
+  top: 0;
+  right: -420px;
+  left: auto;
+  width: 400px;
+  height: 100vh;
+  z-index: 2147483647;
+  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              left  0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.45);
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.autoform-sidebar-container.active {
+  right: 0;
+  left: auto;
+}
+
+/* Left position */
+.autoform-sidebar-container.pos-left {
+  right: auto;
+  left: -420px;
+  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.45);
+  border-left: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.autoform-sidebar-container.pos-left.active {
+  left: 0;
+  right: auto;
+}
+
+.autoform-sidebar-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+}

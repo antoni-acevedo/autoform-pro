@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoForm Pro</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ── Header ── -->
+    <header class="app-header">
+      <div class="header-brand">
+        <h1>AutoForm <span>Pro</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-data" class="icon-btn" title="Datos guardados" aria-label="Datos guardados">
+          <!-- Database icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="Ajustes" aria-label="Ajustes">
+          <!-- Gear icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- VIEW: MAIN (form fields)                       -->
+    <!-- ══════════════════════════════════════════════ -->
+    <section id="view-main" class="view active">
+      <div id="status-container" class="status-badge">
+        <span class="dot"></span>
+        <span id="status-text">Escaneando página...</span>
+        <button id="rescan-button" class="btn-rescan" title="Reescanear campos">↺</button>
+      </div>
+
+      <div id="fields-container" class="fields-list">
+        <div class="empty-state">
+          <p>Esperando campos...</p>
+          <p class="hint">La extensión detecta automáticamente los campos cuando aparecen en la página.</p>
+        </div>
+      </div>
+
+      <!-- Autofill toggle -->
+      <div class="autofill-row">
+        <label class="toggle-wrap" for="autofill-toggle">
+          <span class="toggle-label">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            Autorrellenar al detectar
+          </span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="autofill-toggle" role="switch">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </div>
+        </label>
+      </div>
+
+      <button id="fill-button" class="btn-primary" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        Rellenar Formulario
+      </button>
+
+      <!-- Auto-fill toast -->
+      <div id="autofill-toast" class="autofill-toast" aria-live="polite"></div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- VIEW: DATA (manage saved values)               -->
+    <!-- ══════════════════════════════════════════════ -->
+    <section id="view-data" class="view">
+      <div class="view-header">
+        <button class="btn-back" data-target="view-main">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h2>Datos Guardados</h2>
+        <button id="btn-clear-all" class="btn-danger-sm" title="Borrar todo">Limpiar todo</button>
+      </div>
+      <div id="data-list" class="data-list">
+        <div class="empty-state">
+          <p>No hay datos guardados aún.</p>
+          <p class="hint">Rellena campos en cualquier formulario y se guardarán aquí automáticamente.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- VIEW: SETTINGS                                 -->
+    <!-- ══════════════════════════════════════════════ -->
+    <section id="view-settings" class="view">
+      <div class="view-header">
+        <button class="btn-back" data-target="view-main">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h2>Ajustes</h2>
+      </div>
+
+      <div class="settings-list">
+
+        <!-- Theme toggle -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Tema</span>
+            <span class="setting-desc">Claro u oscuro</span>
+          </div>
+          <div class="theme-toggle">
+            <button id="theme-dark" class="theme-btn active" title="Modo oscuro">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              Oscuro
+            </button>
+            <button id="theme-light" class="theme-btn" title="Modo claro">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+              Claro
+            </button>
+          </div>
+        </div>
+
+        <!-- Position toggle -->
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Posición</span>
+            <span class="setting-desc">Lado del panel en la pantalla</span>
+          </div>
+          <div class="theme-toggle">
+            <button id="pos-right" class="theme-btn active" title="Panel a la derecha">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+              Derecha
+            </button>
+            <button id="pos-left" class="theme-btn" title="Panel a la izquierda">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              Izquierda
+            </button>
+          </div>
+        </div>
+
+        <!-- Persist sidebar state -->
+        <label class="setting-item" for="keep-open-toggle" style="cursor: pointer;">
+          <div class="setting-info">
+            <span class="setting-label">Panel persistente</span>
+            <span class="setting-desc">Mantener siempre abierto</span>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="keep-open-toggle" role="switch">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </div>
+        </label>
+
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <p>AutoForm Pro v1.1 &bull; <span id="footer-data-count">0 datos guardados</span></p>
+    </footer>
+  </div>
+
+  <script src="sidebar.js"></script>
+</body>
+</html>
