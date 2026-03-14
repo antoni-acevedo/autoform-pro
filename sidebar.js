@@ -406,11 +406,11 @@ document.addEventListener('DOMContentLoaded', () => {
         group.appendChild(labelRow);
         group.appendChild(fileWrapper);
 
-      } else if (input.type === 'select') {
+      } else if (input.type === 'select' || input.type === 'custom-select') {
         // ── Select element ──────────────────────────────────────────────────
         const selectEl = document.createElement('select');
         selectEl.dataset.selector = input.selector;
-        selectEl.dataset.type = 'select';
+        selectEl.dataset.type = input.type;
         selectEl.dataset.key = key;
 
         if (input.options) {
@@ -799,7 +799,14 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const a of aliases) if (n.startsWith(a + ' ') || a === n) return key;
     }
     for (const [key, aliases] of Object.entries(FIELD_MAP)) {
-      for (const a of aliases) if (a.length >= 4 && n.includes(a)) return key;
+      for (const a of aliases) {
+        if (a.length >= 4) {
+          try {
+            const regex = new RegExp(`\\b${a}\\b`);
+            if (regex.test(n)) return key;
+          } catch (err) {}
+        }
+      }
     }
     return 'custom_' + n.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').slice(0, 30);
   }

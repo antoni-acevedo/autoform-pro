@@ -144,9 +144,27 @@ function getInputs(deleteRef = true) {
       options: Array.from(select.options).map(o => ({ value: o.value, text: o.text || o.innerText }))
     }));
 
+  // ── Custom Selects (div role="combobox") ─────────────────────
+  const customSelectFields = Array.from(document.querySelectorAll('div[role="combobox"], [data-testid="select-controller"]'))
+    .filter(div => {
+      if (div.closest('[aria-hidden="true"]')) return false;
+      const cs = window.getComputedStyle(div);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || div.offsetWidth === 0) return false;
+      const label = getBestLabel(div).toLowerCase().trim();
+      if (SKIP_LABELS.has(label)) return false;
+      return true;
+    })
+    .map((div, i) => ({
+      placeholder: getBestLabel(div, `csel-${i}`),
+      type: 'custom-select',
+      selector: getUniqueSelector(div, `csel-${i}`),
+      element: div,
+      options: [{ value: 'Sí', text: 'Sí' }, { value: 'No', text: 'No' }] // Falback options
+    }));
+
   // Combine components and group
   const radioFields = Object.values(radioGroups);
-  const allFields = [...standardInputs, ...radioFields, ...textareaFields, ...selectFields];
+  const allFields = [...standardInputs, ...radioFields, ...textareaFields, ...selectFields, ...customSelectFields];
 
   allFields.sort((a, b) => {
     const elA = a.element || (a.options && a.options[0] ? document.querySelector(a.options[0].selector) : null);
@@ -279,11 +297,17 @@ function getBestLabel(input, fallbackIndex) {
         
         // Also check if the sibling is just a text node containing the label
         if (sib.classList?.contains('form-label-inner')) {
-           const txt = clean(sib.innerText);
-           if (isGood(txt)) return txt;
+          const txt = clean(sib.innerText);
+          if (isGood(txt)) return txt;
+        }
+
+        // Fallback: If the sibling is a container node with good descriptive text placed right next to it
+        const fallbackTxt = clean(sib.innerText);
+        if (isGood(fallbackTxt) && fallbackTxt.length > 3 && fallbackTxt.length < 200) {
+           return fallbackTxt;
         }
         
-        return null; // Just do adjacent siblings if we want to be safe, or iterate all
+        return null; 
       }
     };
 
@@ -420,6 +444,25 @@ async function fillForm(data) {
         if (trigger && typeof trigger.click === 'function') {
           trigger.click();
         }
+      }
+    } else if (item.type === 'custom-select' || el.getAttribute('role') === 'combobox') {
+      try {
+        el.click(); // Open the custom dropdown options
+        await new Promise(res => setTimeout(res, 300)); // Wait for it to render items
+        
+        // Find inside standard list containers common for frameworks
+        const items = Array.from(document.querySelectorAll('[role="option"], .select-item, [class*="option"], [class*="item"], .select-dropdown div'));
+        const match = items.find(it => it.innerText.toLowerCase().trim() === item.value.toLowerCase().trim());
+        if (match) {
+           match.click();
+        } else {
+           // Try clicking inside current el wrapper options
+           const nested = Array.from(el.querySelectorAll('[role="option"], div'));
+           const nestedMatch = nested.find(it => it.innerText.toLowerCase().trim() === item.value.toLowerCase().trim());
+           if (nestedMatch) nestedMatch.click();
+        }
+      } catch (err) {
+         console.warn('[AutoForm] Error rellenando custom-select:', err);
       }
     } else {
       // Works for both <input> and <textarea>
