@@ -84,11 +84,34 @@ document.addEventListener('DOMContentLoaded', () => {
   async function triggerAutoFill() {
     const toFill = [];
 
-    // Text/textarea
-    const textEls = fieldsContainer.querySelectorAll('input[data-type]:not([data-type="file"]), textarea[data-type]');
-    for (const el of textEls) {
-      if (el.value.trim()) {
-        toFill.push({ selector: el.dataset.selector, type: 'text', value: el.value });
+    // Text/textarea/checkbox/select
+    const regularEls = fieldsContainer.querySelectorAll('input[data-type]:not([data-type="file"]), textarea[data-type], select[data-type]');
+    for (const el of regularEls) {
+      if (el.dataset.type === 'checkbox') {
+        if (el.checked) {
+          toFill.push({ selector: el.dataset.selector, type: 'checkbox', value: 'true' });
+        }
+      } else if (el.value && el.value.trim()) {
+        toFill.push({ selector: el.dataset.selector, type: el.dataset.type || 'text', value: el.value.trim() });
+      }
+    }
+
+    // Radio groups (Pills or Selects)
+    const radioGroups = fieldsContainer.querySelectorAll('.radio-group');
+    for (const rGroup of radioGroups) {
+      const checked = rGroup.querySelector('input:checked');
+      if (checked) {
+        toFill.push({ selector: checked.dataset.selector, type: 'radio', value: checked.value });
+      }
+    }
+
+    const radioSelects = fieldsContainer.querySelectorAll('select.radio-select');
+    for (const rSelect of radioSelects) {
+      if (rSelect.value) {
+        const opt = rSelect.options[rSelect.selectedIndex];
+        if (opt && opt.dataset.selector) {
+          toFill.push({ selector: opt.dataset.selector, type: 'radio', value: rSelect.value });
+        }
       }
     }
 
@@ -359,34 +382,198 @@ document.addEventListener('DOMContentLoaded', () => {
         group.appendChild(labelRow);
         group.appendChild(fileWrapper);
 
+      } else if (input.type === 'select') {
+        // ── Select element ──────────────────────────────────────────────────
+        const selectEl = document.createElement('select');
+        selectEl.dataset.selector = input.selector;
+        selectEl.dataset.type = 'select';
+        selectEl.dataset.key = key;
+
+        if (input.options) {
+          input.options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.value;
+            o.text = opt.text;
+            if (stored[key] === opt.value) o.selected = true;
+            selectEl.appendChild(o);
+          });
+        }
+
+        if (stored[key]) {
+          group.classList.add('prefilled');
+        }
+
+        selectEl.addEventListener('change', () => {
+          saveValue(key, selectEl.value);
+          group.classList.add('prefilled');
+        });
+
+        group.appendChild(labelRow);
+        group.appendChild(selectEl);
+
+      } else if (input.type === 'radio') {
+        const isCustomDropdown = input.isCustomDropdown || (input.options && input.options.length > 5);
+
+        if (isCustomDropdown) {
+          // ── Render as Select Dropdown ─────────────────────────────────────
+          const selectEl = document.createElement('select');
+          selectEl.className = 'radio-select';
+          selectEl.dataset.key = key;
+
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.text = `Escoge una opción...`;
+          selectEl.appendChild(placeholder);
+
+          if (input.options) {
+            input.options.forEach(opt => {
+              const o = document.createElement('option');
+              o.value = opt.value;
+              o.text = opt.label;
+              o.dataset.selector = opt.selector; // Store backing target
+              if (stored[key] === opt.value) o.selected = true;
+              selectEl.appendChild(o);
+            });
+          }
+
+          if (stored[key]) {
+            group.classList.add('prefilled');
+          }
+
+          selectEl.addEventListener('change', () => {
+            saveValue(key, selectEl.value);
+            group.classList.add('prefilled');
+          });
+
+          group.appendChild(labelRow);
+          group.appendChild(selectEl);
+
+        } else {
+          // ── Radio group (Pills list) ──────────────────────────────────────
+          const radioGroup = document.createElement('div');
+          radioGroup.className = 'radio-group';
+          radioGroup.dataset.key = key;
+
+          // Visual Layout
+          radioGroup.style.display = 'flex';
+          radioGroup.style.flexWrap = 'wrap';
+          radioGroup.style.gap = '8px';
+          radioGroup.style.marginTop = '4px';
+
+          if (input.options) {
+            input.options.forEach(opt => {
+              const labelNode = document.createElement('label');
+              labelNode.style.display = 'inline-flex';
+              labelNode.style.alignItems = 'center';
+              labelNode.style.gap = '4px';
+              labelNode.style.cursor = 'pointer';
+              labelNode.style.fontSize = '12px';
+              labelNode.style.background = 'var(--surface)';
+              labelNode.style.padding = '4px 8px';
+              labelNode.style.borderRadius = 'var(--radius-sm)';
+              labelNode.style.border = '1px solid var(--border)';
+
+              const radio = document.createElement('input');
+              radio.type = 'radio';
+              radio.name = `radio_sidebar_${key}`;
+              radio.value = opt.value;
+              radio.dataset.selector = opt.selector;
+
+              if (stored[key] === opt.value) {
+                radio.checked = true;
+                group.classList.add('prefilled');
+                labelNode.style.borderColor = 'var(--accent)';
+                labelNode.style.background = 'rgba(16, 185, 129, 0.08)';
+              }
+
+              radio.addEventListener('change', () => {
+                saveValue(key, radio.value);
+                radioGroup.querySelectorAll('label').forEach(l => {
+                  l.style.borderColor = 'var(--border)';
+                  l.style.background = 'var(--surface)';
+                });
+                labelNode.style.borderColor = 'var(--accent)';
+                labelNode.style.background = 'rgba(16, 185, 129, 0.08)';
+                group.classList.add('prefilled');
+              });
+
+              labelNode.appendChild(radio);
+              labelNode.appendChild(document.createTextNode(opt.label));
+              radioGroup.appendChild(labelNode);
+            });
+          }
+
+          group.appendChild(labelRow);
+          group.appendChild(radioGroup);
+        }
+
       } else {
-        // ── Text / textarea field ───────────────────────────────────────────
+        // ── Text / textarea / checkbox fields ───────────────────────────────
         let inputEl;
         if (input.type === 'textarea') {
           inputEl = document.createElement('textarea');
           inputEl.rows = 3;
+        } else if (input.type === 'checkbox') {
+          inputEl = document.createElement('input');
+          inputEl.type = 'checkbox';
+          inputEl.style.width = 'auto'; 
+          inputEl.style.cursor = 'pointer';
         } else {
           inputEl = document.createElement('input');
           inputEl.type = 'text';
         }
-        inputEl.placeholder = `Valor para "${input.placeholder}"`;
-        if (stored[key]) {
-          inputEl.value = stored[key];
-          group.classList.add('prefilled');
-        }
+
         inputEl.dataset.selector = input.selector;
         inputEl.dataset.type = input.type;
         inputEl.dataset.key = key;
 
-        inputEl.addEventListener('input', () => {
-          if (inputEl.value.trim()) {
-            saveValue(key, inputEl.value.trim());
+        if (input.type === 'checkbox') {
+          if (stored[key] === 'true' || stored[key] === '1') {
+            inputEl.checked = true;
             group.classList.add('prefilled');
           }
-        });
 
-        group.appendChild(labelRow);
-        group.appendChild(inputEl);
+          inputEl.addEventListener('change', () => {
+            saveValue(key, inputEl.checked ? 'true' : 'false');
+            group.classList.toggle('prefilled', inputEl.checked);
+          });
+        } else {
+          inputEl.placeholder = `Valor para "${input.placeholder}"`;
+          if (stored[key]) {
+            inputEl.value = stored[key];
+            group.classList.add('prefilled');
+          }
+
+          inputEl.addEventListener('input', () => {
+            if (inputEl.value.trim()) {
+              saveValue(key, inputEl.value.trim());
+              group.classList.add('prefilled');
+            } else {
+              group.classList.remove('prefilled');
+            }
+          });
+        }
+
+        if (input.type === 'checkbox') {
+          const checkboxLabel = document.createElement('label');
+          checkboxLabel.style.display = 'inline-flex';
+          checkboxLabel.style.alignItems = 'center';
+          checkboxLabel.style.gap = '8px';
+          checkboxLabel.style.cursor = 'pointer';
+          
+          checkboxLabel.appendChild(inputEl);
+          checkboxLabel.appendChild(document.createTextNode(input.placeholder));
+          
+          const badge = labelRow.querySelector('.field-badge');
+          labelRow.innerHTML = '';
+          labelRow.appendChild(checkboxLabel);
+          if (badge) labelRow.appendChild(badge);
+          
+          group.appendChild(labelRow);
+        } else {
+          group.appendChild(labelRow);
+          group.appendChild(inputEl);
+        }
       }
 
       fieldsContainer.appendChild(group);
@@ -487,11 +674,34 @@ document.addEventListener('DOMContentLoaded', () => {
     fillButton.disabled = true;
     fillButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Procesando...`;
 
-    // Collect text/textarea fields
-    const textInputs = fieldsContainer.querySelectorAll('input[data-type]:not([data-type="file"]), textarea[data-type]');
-    for (const el of textInputs) {
-      if (el.value.trim()) {
-        toFill.push({ selector: el.dataset.selector, type: 'text', value: el.value });
+    // Collect text/textarea/checkbox/select fields
+    const regularEls = fieldsContainer.querySelectorAll('input[data-type]:not([data-type="file"]), textarea[data-type], select[data-type]');
+    for (const el of regularEls) {
+      if (el.dataset.type === 'checkbox') {
+        if (el.checked) {
+          toFill.push({ selector: el.dataset.selector, type: 'checkbox', value: 'true' });
+        }
+      } else if (el.value && el.value.trim()) {
+        toFill.push({ selector: el.dataset.selector, type: el.dataset.type || 'text', value: el.value.trim() });
+      }
+    }
+
+    // Collect radio groups (Pills or Selects)
+    const radioGroups = fieldsContainer.querySelectorAll('.radio-group');
+    for (const rGroup of radioGroups) {
+      const checked = rGroup.querySelector('input:checked');
+      if (checked) {
+        toFill.push({ selector: checked.dataset.selector, type: 'radio', value: checked.value });
+      }
+    }
+
+    const radioSelects = fieldsContainer.querySelectorAll('select.radio-select');
+    for (const rSelect of radioSelects) {
+      if (rSelect.value) {
+        const opt = rSelect.options[rSelect.selectedIndex];
+        if (opt && opt.dataset.selector) {
+          toFill.push({ selector: opt.dataset.selector, type: 'radio', value: rSelect.value });
+        }
       }
     }
 

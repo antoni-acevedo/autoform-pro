@@ -14,7 +14,7 @@ const SKIP_LABELS = new Set([
 ]);
 
 function getInputs() {
-  const EXCLUDED_TYPES = ['hidden', 'submit', 'button', 'radio', 'checkbox', 'image', 'reset'];
+  const EXCLUDED_TYPES = ['hidden', 'submit', 'button', 'image', 'reset'];
 
   // ── Inputs ────────────────────────────────────────────────────────
   const inputs = Array.from(document.querySelectorAll('input')).filter(input => {
@@ -28,13 +28,10 @@ function getInputs() {
     // Special case for file inputs: they are often hidden but linked to a label
     if (type === 'file') {
       if (isHidden) {
-        // Check if input has id that matches a label's for attribute
         if (input.id && document.querySelector(`label[for="${CSS.escape(input.id)}"]`)) return true;
-        // Check if there's a label with for attribute that references this input's parent/ancestor
         const labelForId = input.closest('form, div, section')?.querySelector(`label[for]`);
         if (labelForId) {
           const forId = labelForId.getAttribute('for');
-          // Try to find input with this id
           const referencedInput = document.getElementById(forId);
           if (referencedInput === input) return true;
         }
@@ -45,32 +42,74 @@ function getInputs() {
       return true;
     }
 
-    // For other inputs, if hidden, skip
-    if (isHidden) return false;
+    if (isHidden) {
+      if (type === 'radio' || type === 'checkbox') {
+        const parentFieldset = input.closest('fieldset');
+        const hasSiblingsName = input.name && Array.from(document.querySelectorAll(`input[name="${CSS.escape(input.name)}"]`)).filter(i => i !== input).length > 0;
+        if (parentFieldset || hasSiblingsName) return true;
+      }
+      return false;
+    }
 
-    // Skip inputs inside aria-hidden containers
     if (input.closest('[aria-hidden="true"]')) return false;
 
-    // Skip internal combobox search inputs (country code dropdowns, search boxes, etc)
     if (input.getAttribute('role') === 'combobox') {
       const resolvedLabel = getBestLabel(input).toLowerCase().trim();
-      // Skip if label is generic or contains phone/country code patterns
       if (SKIP_LABELS.has(resolvedLabel)) return false;
       if (resolvedLabel.includes('código') || resolvedLabel.includes('country code') || 
           resolvedLabel.includes('selecciona') || resolvedLabel.includes('seleccionar')) return false;
-      // Also skip if this looks like a dropdown trigger inside a select wrapper
       if (input.closest('.select-module_select-wrapper')) return false;
     }
 
     return true;
   });
 
-  const inputFields = inputs.map((input, index) => ({
-    placeholder: getBestLabel(input, index),
-    type: input.type || 'text',
-    selector: getUniqueSelector(input, index),
-    element: input
-  }));
+  const standardInputs = [];
+  const radioGroups = {};
+
+  inputs.forEach((input, index) => {
+    const type = (input.type || 'text').toLowerCase();
+    const label = getBestLabel(input, index);
+
+    // Recalculate visibility for setting CustomDropdown flags
+    const cs = window.getComputedStyle(input);
+    const isHidden = cs.display === 'none' || cs.visibility === 'hidden' || input.offsetWidth === 0;
+
+    if (type === 'radio') {
+      const parentFieldset = input.closest('fieldset');
+      let groupLabel = label;
+      if (parentFieldset) {
+        const legend = parentFieldset.querySelector('legend');
+        if (legend) groupLabel = legend.innerText.trim().replace(/\*/g, '').trim();
+      }
+      const name = input.name || `radio-group-${index}`;
+      if (!radioGroups[name]) {
+        radioGroups[name] = {
+          placeholder: groupLabel,
+          type: 'radio',
+          isCustomDropdown: false,
+          options: []
+        };
+      }
+      
+      if (isHidden || input.closest('[data-controller*="dropdown"]')) {
+        radioGroups[name].isCustomDropdown = true;
+      }
+
+      radioGroups[name].options.push({
+        label: label,
+        value: input.value,
+        selector: getUniqueSelector(input, index)
+      });
+    } else {
+      standardInputs.push({
+        placeholder: label,
+        type: type,
+        selector: getUniqueSelector(input, index),
+        element: input
+      });
+    }
+  });
 
   // ── Textareas ─────────────────────────────────────────────────────
   const textareaFields = Array.from(document.querySelectorAll('textarea'))
@@ -87,13 +126,12 @@ function getInputs() {
       element: ta
     }));
 
-  // ── Selects (excluding inputs that are already handled) ──────────────────
+  // ── Selects ──────────────────────────────────────────────────
   const selectFields = Array.from(document.querySelectorAll('select'))
     .filter(select => {
       if (select.closest('[aria-hidden="true"]')) return false;
       const cs = window.getComputedStyle(select);
       if (cs.display === 'none' || cs.visibility === 'hidden' || select.offsetWidth === 0) return false;
-      // Skip internal dropdown search inputs
       const label = getBestLabel(select).toLowerCase().trim();
       if (SKIP_LABELS.has(label)) return false;
       return true;
@@ -102,23 +140,32 @@ function getInputs() {
       placeholder: getBestLabel(select, `sel-${i}`),
       type: 'select',
       selector: getUniqueSelector(select, `sel-${i}`),
-      element: select
+      element: select,
+      options: Array.from(select.options).map(o => ({ value: o.value, text: o.text || o.innerText }))
     }));
 
-  // Merge and Sort by DOM position
-  const allFields = [...inputFields, ...textareaFields, ...selectFields];
+  // Combine components and group
+  const radioFields = Object.values(radioGroups);
+  const allFields = [...standardInputs, ...radioFields, ...textareaFields, ...selectFields];
+
   allFields.sort((a, b) => {
-    const pos = a.element.compareDocumentPosition(b.element);
-    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    const elA = a.element || (a.options && a.options[0] ? document.querySelector(a.options[0].selector) : null);
+    const elB = b.element || (b.options && b.options[0] ? document.querySelector(b.options[0].selector) : null);
+    if (elA && elB) {
+      const pos = elA.compareDocumentPosition(elB);
+      if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+      if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    }
     return 0;
   });
 
   // Deduplicate by selector and remove element ref before sending
   const seen = new Set();
   return allFields.filter(f => {
-    if (seen.has(f.selector)) return false;
-    seen.add(f.selector);
+    const selector = f.selector || (f.options && f.options[0] ? f.options[0].selector : null);
+    if (!selector) return true;
+    if (seen.has(selector)) return false;
+    seen.add(selector);
     delete f.element;
     return true;
   });
@@ -128,7 +175,7 @@ function getInputs() {
 /**
  * Resolves the best human-readable label for an input or textarea.
  * Priority (highest → lowest):
- *   0. Input's own previous siblings (sibling-label pattern like space-y-2)
+ *   0. Input's own siblings (common with radio/checkbox: input then label)
  *   1. aria-labelledby  (references a real visible label element)
  *   2. <label for="id"> (classic HTML association)
  *   3. aria-label       (only if not in the generic SKIP_LABELS set)
@@ -140,21 +187,35 @@ function getBestLabel(input, fallbackIndex) {
   const clean = (str) => (str || '').replace(/\*/g, '').trim();
   const isGood = (txt) => txt && !SKIP_LABELS.has(txt.toLowerCase());
 
-  // 0. INPUT'S OWN previous siblings — catches the common pattern:
-  //    <div class="space-y-2"><label>Phone</label><input> ... </div>
-  let ownSibling = input.previousElementSibling;
-  while (ownSibling) {
-    if (ownSibling.tagName === 'LABEL') {
-      const txt = clean(ownSibling.innerText);
+  // 0. INPUT'S OWN siblings — catches both preceding label and following label
+  // preceding label: <label>Phone</label><input>
+  // following label: <input type="checkbox"><label>I accept</label>
+  let sib = input.previousElementSibling;
+  while (sib) {
+    if (sib.tagName === 'LABEL') {
+      const txt = clean(sib.innerText);
       if (isGood(txt)) return txt;
     }
-    // A span/div directly before the input may wrap the label text
-    const innerLbl = ownSibling.querySelector('label');
+    const innerLbl = sib.querySelector('label');
     if (innerLbl) {
       const txt = clean(innerLbl.innerText);
       if (isGood(txt)) return txt;
     }
-    ownSibling = ownSibling.previousElementSibling;
+    sib = sib.previousElementSibling;
+  }
+
+  sib = input.nextElementSibling;
+  while (sib) {
+    if (sib.tagName === 'LABEL') {
+      const txt = clean(sib.innerText);
+      if (isGood(txt)) return txt;
+    }
+    const innerLbl = sib.querySelector('label');
+    if (innerLbl) {
+      const txt = clean(innerLbl.innerText);
+      if (isGood(txt)) return txt;
+    }
+    sib = sib.nextElementSibling;
   }
 
   // 1. aria-labelledby — can reference multiple IDs (space-separated)
@@ -289,7 +350,10 @@ async function fillForm(data) {
       continue;
     }
 
-    if (item.type === 'file' && item.fileData) {
+    const tagName = el.tagName.toLowerCase();
+    const type = (el.type || '').toLowerCase();
+
+    if (type === 'file' && item.fileData) {
       try {
         const blob = await (await fetch(item.fileData.data)).blob();
         const file = new File([blob], item.fileData.name, { type: item.fileData.type });
@@ -299,11 +363,28 @@ async function fillForm(data) {
       } catch (e) {
         console.error('[AutoForm] Error adjuntando archivo:', e);
       }
-    } else if (item.type === 'select') {
-      // Handle select elements
+    } else if (tagName === 'select') {
       el.focus();
       el.value = item.value;
       el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (type === 'checkbox') {
+      el.focus();
+      const shouldCheck = item.value === 'true' || item.value === '1' || item.value === 'on' || item.value === el.value;
+      el.checked = shouldCheck;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (type === 'radio') {
+      if (item.value === 'true' || item.value === '1' || item.value === el.value) {
+        el.focus();
+        el.checked = true;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // Support for custom-built visual dropdowns backed by radios (e.g. Stimulus)
+        const parentNode = el.closest('.question') || el.closest('fieldset') || el.closest('[data-controller]');
+        const trigger = parentNode?.querySelector(`[data-value="${CSS.escape(el.value)}"]`);
+        if (trigger && typeof trigger.click === 'function') {
+          trigger.click();
+        }
+      }
     } else {
       // Works for both <input> and <textarea>
       el.focus();
