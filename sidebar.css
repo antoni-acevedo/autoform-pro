@@ -544,6 +544,40 @@ textarea:focus {
   cursor: not-allowed;
 }
 
+/* ── Secondary button ────────────────────────── */
+
+.btn-secondary {
+  width: 100%;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active:not(:disabled) { transform: translateY(0); }
+
+.btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── Empty state ─────────────────────────────── */
 .empty-state {
   text-align: center;

@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldsContainer = document.getElementById('fields-container');
   const statusText      = document.getElementById('status-text');
   const fillButton      = document.getElementById('fill-button');
+  const syncButton      = document.getElementById('sync-button');
   const rescanButton    = document.getElementById('rescan-button');
   const btnData         = document.getElementById('btn-data');
   const btnSettings     = document.getElementById('btn-settings');
@@ -36,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         detectedInputs = data.inputs;
         statusText.innerText = `${detectedInputs.length} campo${detectedInputs.length > 1 ? 's' : ''} detectado${detectedInputs.length > 1 ? 's' : ''}`;
         fillButton.disabled = false;
+        if (syncButton) syncButton.disabled = false;
+        
         loadAllValues(stored => {
           loadAllFiles(storedFiles => {
             renderFields(detectedInputs, stored, storedFiles);
@@ -55,8 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="hint">La extensión detecta automáticamente los campos cuando aparecen en la página.</p>
           </div>`;
         fillButton.disabled = true;
+        if (syncButton) syncButton.disabled = true;
       }
     }
+
 
     if (data.action === 'FILL_RESPONSE') {
       fillButton.disabled = false;
@@ -70,6 +75,18 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         fillButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Rellenar Formulario`;
       }
+    }
+
+    if (data.action === 'SYNC_DONE') {
+      if (syncButton) syncButton.disabled = false;
+      showAutofillToast(`¡${data.count} campo${data.count === 1 ? '' : 's'} guardado${data.count === 1 ? '' : 's'} en la extensión!`);
+      if (syncButton) {
+         syncButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Guarda exitosa`;
+         setTimeout(() => {
+            syncButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Sincronizar Formulario`;
+         }, 2500);
+      }
+      renderDataView(); // Reload saved data lists
     }
   });
 
@@ -734,6 +751,14 @@ document.addEventListener('DOMContentLoaded', () => {
       sendToParent({ action: 'FILL_FORM', data: toFill });
     });
   });
+
+  if (syncButton) {
+     syncButton.addEventListener('click', () => {
+         syncButton.disabled = true;
+         syncButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Sincronizando...`;
+         sendToParent({ action: 'SYNC_FORM' });
+     });
+  }
 
   // ── Field map + canonical key ─────────────────────────────────────────────
   const FIELD_MAP = {

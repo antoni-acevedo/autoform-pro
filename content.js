@@ -13,7 +13,7 @@ const SKIP_LABELS = new Set([
   'type to search', 'search for', 'filter', 'buscar'
 ]);
 
-function getInputs() {
+function getInputs(deleteRef = true) {
   const EXCLUDED_TYPES = ['hidden', 'submit', 'button', 'image', 'reset'];
 
   // ── Inputs ────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ function getInputs() {
     if (!selector) return true;
     if (seen.has(selector)) return false;
     seen.add(selector);
-    delete f.element;
+    if (deleteRef) delete f.element;
     return true;
   });
 }
@@ -513,6 +513,65 @@ function stopObserver() {
   }
 }
 
+function syncFormToStorage() {
+  const fields = getInputs(false); // Do not delete element reference
+  const updates = {};
+  let count = 0;
+
+  fields.forEach(f => {
+    // Generate the exact same key format as sidebar.js
+    const key = f.placeholder ? 
+      f.placeholder.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '') : 
+      null;
+
+    if (!key) return;
+
+    if (f.type === 'radio') {
+      if (f.options) {
+        f.options.forEach(opt => {
+          const radioNode = document.querySelector(opt.selector);
+          if (radioNode && radioNode.checked) {
+            updates[key] = opt.value;
+            count++;
+          }
+        });
+      }
+    } else if (f.type === 'checkbox') {
+      if (f.element && f.element.checked) {
+        updates[key] = 'true';
+        count++;
+      }
+    } else if (f.type === 'select') {
+      if (f.element && f.element.value) {
+        updates[key] = f.element.value;
+        count++;
+      }
+    } else { // text, textarea
+      if (f.element && f.element.value && f.element.value.trim()) {
+        updates[key] = f.element.value.trim();
+        count++;
+      }
+    }
+  });
+
+  if (count > 0) {
+    chrome.storage.sync.set(updates, () => {
+      console.log('[AutoForm] Sincronización completa:', updates);
+      sidebarIframe?.contentWindow?.postMessage({ 
+        source: 'autoform-contentscript', 
+        action: 'SYNC_DONE', 
+        count: count 
+      }, '*');
+    });
+  } else {
+    sidebarIframe?.contentWindow?.postMessage({ 
+      source: 'autoform-contentscript', 
+      action: 'SYNC_DONE', 
+      count: 0 
+    }, '*');
+  }
+}
+
 // ── Message bridge: sidebar (iframe) <-> content script (page) ───────────────
 window.addEventListener('message', async (event) => {
   const data = event.data;
@@ -532,6 +591,10 @@ window.addEventListener('message', async (event) => {
       { source: 'autoform-contentscript', action: 'FILL_RESPONSE', success: true },
       '*'
     );
+  }
+
+  if (data.action === 'SYNC_FORM') {
+    syncFormToStorage();
   }
 
   if (data.action === 'APPLY_SETTINGS' && data.settings) {
