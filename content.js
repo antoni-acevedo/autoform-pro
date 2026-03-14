@@ -437,7 +437,9 @@ async function fillForm(data) {
 
 // ── Sidebar management ───────────────────────────────────────────────────────
 
-function createSidebar() {
+function createSidebar(isActive = true) {
+  if (sidebarContainer) return; // Already exists
+
   sidebarContainer = document.createElement('div');
   sidebarContainer.className = 'autoform-sidebar-container';
 
@@ -452,9 +454,11 @@ function createSidebar() {
   chrome.storage.sync.get('autoform_settings', result => {
     const settings = result.autoform_settings || { position: 'right' };
     applyPosition(settings.position);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => sidebarContainer.classList.add('active'));
-    });
+    if (isActive) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => sidebarContainer.classList.add('active'));
+      });
+    }
   });
 
   // Start watching for dynamic fields AFTER sidebar is created
@@ -597,8 +601,19 @@ window.addEventListener('message', async (event) => {
     syncFormToStorage();
   }
 
+  if (data.action === 'MINIMIZE_SIDEBAR') {
+    sidebarContainer?.classList.remove('active');
+    document.querySelector('.autoform-fab')?.classList.remove('hidden');
+    stopObserver();
+  }
+
   if (data.action === 'APPLY_SETTINGS' && data.settings) {
     applyPosition(data.settings.position);
+    if (data.settings.keepOpen) {
+      createFab();
+    } else {
+      document.querySelector('.autoform-fab')?.remove();
+    }
   }
 });
 
@@ -610,13 +625,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// ── Floating Button (FAB) ───────────────────────────────────────────────────
+function createFab() {
+  if (document.querySelector('.autoform-fab')) return;
+
+  const fab = document.createElement('div');
+  fab.className = 'autoform-fab';
+  fab.innerHTML = `
+    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(15deg);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+    </div>
+  `;
+
+  // Load sidebar implicitly on the background to enable silent autofill
+  createSidebar(false);
+
+  if (sidebarContainer && sidebarContainer.classList.contains('active')) {
+     fab.classList.add('hidden');
+  }
+
+  document.body.appendChild(fab);
+
+  fab.addEventListener('click', () => {
+    fab.classList.add('hidden');
+    if (sidebarContainer) {
+      sidebarContainer.classList.add('active');
+      startObserver();
+    }
+  });
+
+  // Check if position was updated to left
+  chrome.storage.sync.get('autoform_settings', result => {
+     if (result.autoform_settings?.position === 'left') {
+        const ctr = document.querySelector('.autoform-sidebar-container');
+        if (ctr) ctr.classList.add('pos-left');
+     }
+  });
+}
+
 // ── Auto-initialize sidebar on load if setting is enabled ────────────────────
 const initAutoSidebar = () => {
   chrome.storage.sync.get('autoform_settings', result => {
     if (chrome.runtime.lastError) return;
     const settings = result.autoform_settings;
-    if (settings && settings.keepOpen && !sidebarContainer) {
-      createSidebar();
+    if (settings && settings.keepOpen) {
+      createFab(); // Draw FAB instead of sidebar directly
     }
   });
 };

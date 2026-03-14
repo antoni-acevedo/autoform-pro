@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const rescanButton    = document.getElementById('rescan-button');
   const btnData         = document.getElementById('btn-data');
   const btnSettings     = document.getElementById('btn-settings');
+  const btnMinimize     = document.getElementById('btn-minimize');
   const dataList        = document.getElementById('data-list');
   const footerCount     = document.getElementById('footer-data-count');
   const btnClearAll     = document.getElementById('btn-clear-all');
@@ -178,6 +179,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const isActive = document.getElementById('view-settings').classList.contains('active');
     showView(isActive ? 'view-main' : 'view-settings');
   });
+
+  if (btnMinimize) {
+    btnMinimize.addEventListener('click', () => {
+      sendToParent({ action: 'MINIMIZE_SIDEBAR' });
+    });
+  }
 
   // Back buttons
   document.querySelectorAll('.btn-back').forEach(btn => {
