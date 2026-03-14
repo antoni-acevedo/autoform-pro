@@ -248,7 +248,7 @@ function getBestLabel(input, fallbackIndex) {
 
   // 4. Walk up the DOM tree looking for a sibling/parent <label>, <legend>, or heading
   let ancestor = input.parentElement;
-  for (let depth = 0; depth < 10 && ancestor; depth++) {
+  for (let depth = 0; depth < 8 && ancestor; depth++) {
     // Check if we found a fieldset with a legend
     if (ancestor.tagName === 'FIELDSET') {
       const legend = ancestor.querySelector('legend');
@@ -257,23 +257,59 @@ function getBestLabel(input, fallbackIndex) {
         if (isGood(txt)) return txt;
       }
     }
+    
     if (ancestor.tagName === 'LABEL' || ancestor.tagName === 'LEGEND') {
       const txt = clean(ancestor.innerText);
       if (isGood(txt)) return txt;
     }
-    let sibling = ancestor.previousElementSibling;
-    while (sibling) {
-      if (sibling.tagName === 'LABEL' || sibling.tagName === 'LEGEND') {
-        const txt = clean(sibling.innerText);
-        if (isGood(txt)) return txt;
+
+    // Search siblings (both directions)
+    const scanSiblings = (startNode) => {
+      let sib = startNode;
+      while (sib) {
+        if (sib.tagName === 'LABEL' || sib.tagName === 'LEGEND') {
+          const txt = clean(sib.innerText);
+          if (isGood(txt)) return txt;
+        }
+        const innerLabel = sib.querySelector('label, legend, [id$="-label"], .form-label-inner, [class*="label"]');
+        if (innerLabel) {
+          const txt = clean(innerLabel.innerText);
+          if (isGood(txt)) return txt;
+        }
+        
+        // Also check if the sibling is just a text node containing the label
+        if (sib.classList?.contains('form-label-inner')) {
+           const txt = clean(sib.innerText);
+           if (isGood(txt)) return txt;
+        }
+        
+        return null; // Just do adjacent siblings if we want to be safe, or iterate all
       }
-      const innerLabel = sibling.querySelector('label, legend, [id$="-label"], [class*="label"]');
-      if (innerLabel) {
-        const txt = clean(innerLabel.innerText);
-        if (isGood(txt)) return txt;
-      }
-      sibling = sibling.previousElementSibling;
+    };
+
+    // Check adjacent siblings first
+    let prev = ancestor.previousElementSibling;
+    if (prev) {
+      const txt = scanSiblings(prev);
+      if (txt) return txt;
     }
+
+    let nxt = ancestor.nextElementSibling;
+    if (nxt) {
+      const txt = scanSiblings(nxt);
+      if (txt) return txt;
+    }
+
+    // Stop traversing if we hit a layout row or fieldset (prevents leaking to other questions)
+    if (ancestor.classList?.contains('row') || ancestor.classList?.contains('form-group') || ancestor.tagName === 'FIELDSET') {
+       // Search within the whole ancestor container before giving up
+       const within = ancestor.querySelector('.form-label-inner, label, legend');
+       if (within && isGood(clean(within.innerText))) {
+          return clean(within.innerText);
+       }
+       break; // Do not go up into row grids to avoid picking up previous column names
+    }
+
     ancestor = ancestor.parentElement;
   }
 
