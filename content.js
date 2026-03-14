@@ -8,7 +8,9 @@ let observer = null;
 const SKIP_LABELS = new Set([
   'buscar', 'search', 'textbox', 'input', 'select', 'seleccionar',
   'combobox', 'dropdown', 'opción', 'option', 'campo', 'field',
-  'text', 'texto', 'escribir', 'type here', 'start typing'
+  'text', 'texto', 'escribir', 'type here', 'start typing',
+  'selecciona el código del país', 'código del país', 'country code',
+  'type to search', 'search for', 'filter', 'buscar'
 ]);
 
 function getInputs() {
@@ -26,7 +28,16 @@ function getInputs() {
     // Special case for file inputs: they are often hidden but linked to a label
     if (type === 'file') {
       if (isHidden) {
+        // Check if input has id that matches a label's for attribute
         if (input.id && document.querySelector(`label[for="${CSS.escape(input.id)}"]`)) return true;
+        // Check if there's a label with for attribute that references this input's parent/ancestor
+        const labelForId = input.closest('form, div, section')?.querySelector(`label[for]`);
+        if (labelForId) {
+          const forId = labelForId.getAttribute('for');
+          // Try to find input with this id
+          const referencedInput = document.getElementById(forId);
+          if (referencedInput === input) return true;
+        }
         const walkedLabel = getBestLabel(input);
         if (walkedLabel && !walkedLabel.startsWith('campo-')) return true;
         return false;
@@ -40,10 +51,15 @@ function getInputs() {
     // Skip inputs inside aria-hidden containers
     if (input.closest('[aria-hidden="true"]')) return false;
 
-    // Skip internal combobox search inputs whose resolved label is generic
+    // Skip internal combobox search inputs (country code dropdowns, search boxes, etc)
     if (input.getAttribute('role') === 'combobox') {
       const resolvedLabel = getBestLabel(input).toLowerCase().trim();
+      // Skip if label is generic or contains phone/country code patterns
       if (SKIP_LABELS.has(resolvedLabel)) return false;
+      if (resolvedLabel.includes('código') || resolvedLabel.includes('country code') || 
+          resolvedLabel.includes('selecciona') || resolvedLabel.includes('seleccionar')) return false;
+      // Also skip if this looks like a dropdown trigger inside a select wrapper
+      if (input.closest('.select-module_select-wrapper')) return false;
     }
 
     return true;
@@ -53,7 +69,7 @@ function getInputs() {
     placeholder: getBestLabel(input, index),
     type: input.type || 'text',
     selector: getUniqueSelector(input, index),
-    element: input // Keep reference for sorting
+    element: input
   }));
 
   // ── Textareas ─────────────────────────────────────────────────────
@@ -71,8 +87,26 @@ function getInputs() {
       element: ta
     }));
 
+  // ── Selects (excluding inputs that are already handled) ──────────────────
+  const selectFields = Array.from(document.querySelectorAll('select'))
+    .filter(select => {
+      if (select.closest('[aria-hidden="true"]')) return false;
+      const cs = window.getComputedStyle(select);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || select.offsetWidth === 0) return false;
+      // Skip internal dropdown search inputs
+      const label = getBestLabel(select).toLowerCase().trim();
+      if (SKIP_LABELS.has(label)) return false;
+      return true;
+    })
+    .map((select, i) => ({
+      placeholder: getBestLabel(select, `sel-${i}`),
+      type: 'select',
+      selector: getUniqueSelector(select, `sel-${i}`),
+      element: select
+    }));
+
   // Merge and Sort by DOM position
-  const allFields = [...inputFields, ...textareaFields];
+  const allFields = [...inputFields, ...textareaFields, ...selectFields];
   allFields.sort((a, b) => {
     const pos = a.element.compareDocumentPosition(b.element);
     if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
@@ -151,20 +185,28 @@ function getBestLabel(input, fallbackIndex) {
     if (isGood(txt)) return txt;
   }
 
-  // 4. Walk up the DOM tree looking for a sibling/parent <label> or heading
+  // 4. Walk up the DOM tree looking for a sibling/parent <label>, <legend>, or heading
   let ancestor = input.parentElement;
-  for (let depth = 0; depth < 6 && ancestor; depth++) {
-    if (ancestor.tagName === 'LABEL') {
+  for (let depth = 0; depth < 10 && ancestor; depth++) {
+    // Check if we found a fieldset with a legend
+    if (ancestor.tagName === 'FIELDSET') {
+      const legend = ancestor.querySelector('legend');
+      if (legend) {
+        const txt = clean(legend.innerText);
+        if (isGood(txt)) return txt;
+      }
+    }
+    if (ancestor.tagName === 'LABEL' || ancestor.tagName === 'LEGEND') {
       const txt = clean(ancestor.innerText);
       if (isGood(txt)) return txt;
     }
     let sibling = ancestor.previousElementSibling;
     while (sibling) {
-      if (sibling.tagName === 'LABEL') {
+      if (sibling.tagName === 'LABEL' || sibling.tagName === 'LEGEND') {
         const txt = clean(sibling.innerText);
         if (isGood(txt)) return txt;
       }
-      const innerLabel = sibling.querySelector('label, [id$="-label"], [class*="label"]');
+      const innerLabel = sibling.querySelector('label, legend, [id$="-label"], [class*="label"]');
       if (innerLabel) {
         const txt = clean(innerLabel.innerText);
         if (isGood(txt)) return txt;
@@ -176,12 +218,38 @@ function getBestLabel(input, fallbackIndex) {
 
   // 5. placeholder — skip for comboboxes and skip if generic
   const ph = input.placeholder;
-  if (ph && isGood(ph.toLowerCase().trim()) && input.getAttribute('role') !== 'combobox') {
-    return clean(ph);
+  if (ph && input.getAttribute('role') !== 'combobox') {
+    const phLower = ph.toLowerCase().trim();
+    if (phLower && !SKIP_LABELS.has(phLower)) {
+      return clean(ph);
+    }
+  }
+
+  // 5b. Also check data-test-id as fallback
+  const dataTestId = input.getAttribute('data-test-id');
+  if (dataTestId) {
+    // Extract meaningful part from test ID like "Informaci_n_de_contacto_phone"
+    const cleaned = dataTestId
+      .replace(/^Informaci_n_de_contacto_/, '')
+      .replace(/^Preguntas_sobre_la_solicitud_/, '')
+      .replace(/^Preguntas_espec_ficas_sobre_el_puesto_/, '')
+      .replace(/_/g, ' ')
+      .toLowerCase();
+    if (isGood(cleaned)) return cleaned;
   }
 
   // 6. name attribute
   if (input.name && input.name.trim()) return input.name.trim();
+
+  // 7. Special case for phone inputs - check if inside phone fieldset
+  const parentFieldset = input.closest('fieldset');
+  if (parentFieldset) {
+    const legend = parentFieldset.querySelector('legend');
+    if (legend) {
+      const txt = clean(legend.innerText);
+      if (isGood(txt)) return txt;
+    }
+  }
 
   return `campo-${fallbackIndex ?? 0}`;
 }
@@ -231,18 +299,24 @@ async function fillForm(data) {
       } catch (e) {
         console.error('[AutoForm] Error adjuntando archivo:', e);
       }
+    } else if (item.type === 'select') {
+      // Handle select elements
+      el.focus();
+      el.value = item.value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
       // Works for both <input> and <textarea>
       el.focus();
       el.value = item.value;
-    }
 
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+    }
   }
 }
+
 
 // ── Sidebar management ───────────────────────────────────────────────────────
 
