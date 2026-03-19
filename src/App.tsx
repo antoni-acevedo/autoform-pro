@@ -38,7 +38,16 @@ export default function App() {
       const key = input.id || input.name || input.value;
       if (key) initial[key] = input.value || input.placeholder || '';
     });
-    setFormValues((prev) => ({ ...initial, ...prev }));
+    setFormValues((prev) => {
+      const next: Record<string, string> = { ...initial };
+      // Preservar los valores editados solo para los elementos que aún existen en el nuevo formulario
+      for (const key in prev) {
+        if (key in initial) {
+          next[key] = prev[key];
+        }
+      }
+      return next;
+    });
   }, [inputsHTML]);
 
   const handleInputChange = (key: string, value: string) => {
