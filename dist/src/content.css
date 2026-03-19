@@ -1,0 +1,14 @@
+/* Styles injected through content.css in src */
+
+.ext-pro-marker {
+  animation: glow-fade 1.5s ease-out;
+  box-shadow: 0 0 10px rgba(124, 77, 255, 0.4);
+  background: rgba(124, 77, 255, 0.05);
+  border: 1px dashed #7c4dff;
+}
+
+@keyframes glow-fade {
+  0% { opacity: 0; filter: blur(4px); transform: scale(0.95); }
+  50% { opacity: 1; filter: blur(0px); transform: scale(1.02); }
+  100% { opacity: 0; filter: blur(2px); transform: scale(1); }
+}
