@@ -1,3 +1,3 @@
-import 'http://localhost:5175/@vite/env';
-import 'http://localhost:5175/@crx/client-worker';
-import 'http://localhost:5175/src/background.ts';
+import 'http://localhost:5173/@vite/env';
+import 'http://localhost:5173/@crx/client-worker';
+import 'http://localhost:5173/src/background.ts';

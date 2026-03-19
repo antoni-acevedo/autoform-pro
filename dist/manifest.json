@@ -1,15 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "Chrome Extension Pro (React + TS)",
+  "name": "AutoFormProv2",
   "version": "1.0.0",
-  "description": "Una extensión de Chrome potenciada por React, TypeScript y TailwindCSS.",
+  "description": "AutoFormProv2 by Antoni",
   "permissions": [
     "storage",
     "activeTab",
-    "tabs"
+    "tabs",
+    "contextMenus",
+    "sidePanel"
   ],
-  "action": {
-    "default_popup": "index.html"
+  "action": {},
+  "side_panel": {
+    "default_path": "index.html"
   },
   "background": {
     "service_worker": "service-worker-loader.js",
