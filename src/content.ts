@@ -1,49 +1,71 @@
-// Content Script
-console.log('%c[Extension Pro TS] Content Script Cargado', 'color: #7c4dff; font-weight: bold;');
+/**
+ * 🌐 CONTENT SCRIPT (Inyectado en la página)
+ * ------------------------------------------
+ * Este archivo se ejecuta DENTRO de la página web que el usuario está visitando.
+ * Tiene acceso total al DOM (HTML) y puede interactuar con la página.
+ * 
+ * CARACTERÍSTICAS:
+ * - Puede leer y modificar el HTML (document.body, etc.).
+ * - Puede escuchar eventos del usuario (clics, teclado).
+ * - Se ejecuta en un "sandbox" separado del navegador, por seguridad.
+ * - Se comunica con el Background Script para enviar datos o recibir órdenes.
+ */
 
-let isEnabled: boolean = true;
-let clickCount: number = 0;
+interface InputData {
+    id: string;
+    name: string;
+    type: string;
+    value: string;
+    placeholder: string;
+    required: boolean;
+    disabled: boolean;
+    readonly: boolean;
+    options?: { value: string; text: string; selected: boolean }[];
+}
 
-// 1. Cargar estado inicial
-chrome.storage.local.get(['isEnabled', 'clicksCount'], (result) => {
-    isEnabled = result.isEnabled !== undefined ? result.isEnabled : true;
-    clickCount = result.clicksCount || 0;
-});
+function getInputsHTML() {
+    const inputs = document.querySelectorAll('input, select, textarea');
+    const inputsHTML = Array.from(inputs).map((el: Element) => {
+        const input = el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
-// 2. Escuchar mensajes del Popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'toggleState') {
-        isEnabled = request.isEnabled;
-        console.log(`[Extension Pro] Estado cambiado: ${isEnabled ? 'ON' : 'OFF'}`);
-        return true;
-    }
+        console.log(el);
 
-    if (request.action === 'runFeature') {
-        if (!isEnabled) {
-            sendResponse({ success: false, message: 'La extensión está desactivada' });
-            return;
+        let returnData: InputData = {
+            id: input.id,
+            name: input.name,
+            type: input.type,
+            value: input.value,
+            placeholder: 'placeholder' in input ? input.placeholder : '',
+            required: input.required,
+            disabled: input.disabled,
+            readonly: 'readOnly' in input ? input.readOnly : false,
         }
 
-        const elements = document.querySelectorAll('div, p, a, img');
-        const count = elements.length;
+        if (input.type === 'select-one') {
+            returnData.value = input.value || '';
+            returnData.options = Array.from<HTMLOptionElement>((input as unknown as HTMLSelectElement).options).map((option) => ({
+                value: option.value,
+                text: option.text,
+                selected: option.selected,
+            }));
 
-        // Efecto visual
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position: fixed; inset: 0; border: 4px solid #7c4dff; pointer-events: none; z-index: 999999; transition: opacity 1s; opacity: 1;';
-        document.body.appendChild(overlay);
-        setTimeout(() => { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 1000); }, 500);
+        }
 
-        sendResponse({ success: true, message: `¡Escaneado (TS)! Encontrados ${count} elementos.`, count: count });
-        chrome.storage.local.set({ elementsFound: count });
+        return returnData || {};
+
+    });
+    return inputsHTML || [];
+}
+
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'getInputsHTML') {
+        const inputsHTML = getInputsHTML();
+        sendResponse({ inputsHTML });
     }
 });
 
-// 3. Capturar clicks
-document.addEventListener('click', () => {
-    if (!isEnabled) return;
-    clickCount++;
-    chrome.storage.local.set({ clicksCount: clickCount });
-    chrome.runtime.sendMessage({ action: 'updateStats', clicks: clickCount }).catch(() => {});
-});
 
-export {};
+
+
+export { };
