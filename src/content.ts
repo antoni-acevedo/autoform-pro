@@ -19,6 +19,9 @@ function getFields() {
     const allInputs = document.querySelectorAll('input, select, textarea');
 
     allInputs.forEach((input: any) => {
+        // 🛑 Ignoramos inputs de tipo archivo (File)
+        if (input.type === "file") return;
+
         let labelText = "sin-label";
 
         if (input.placeholder) {
@@ -55,7 +58,7 @@ function getFields() {
         fields.push({
             label: { text: labelText },
             input: {
-                value: input.value || "",
+                value: input.type === "checkbox" ? String(input.checked) : (input.value || ""),
                 name: input.name || input.id || "sin-nombre",
                 type: input.type || input.tagName.toLowerCase(),
                 placeholder: input.placeholder || "",
