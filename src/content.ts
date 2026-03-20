@@ -1,12 +1,18 @@
 function strategy1() {
-    //debemos buscar todos los divs y quedarnos con los que tienen un label y un input dentro
     const getDivs = document.querySelectorAll('div');
-
     const fields: any[] = [];
+    const processedInputs = new Set<HTMLInputElement>(); // Para registrar inputs ya procesados
+    let countInputs = 0;
+
     getDivs.forEach((div: any) => {
         const label = div.querySelector('label');
         const input = div.querySelector('input');
+
         if (label && input) {
+            countInputs++;
+            // Si ya procesamos este input exacto, lo saltamos
+            if (processedInputs.has(input)) return;
+
             console.log(label.textContent, input.value);
             fields.push({
                 label: {
@@ -21,17 +27,23 @@ function strategy1() {
                     disabled: input.disabled || false
                 }
             });
+
+            processedInputs.add(input); // Marcamos el input como procesado
         }
     });
 
-    return fields;
+    return { fields, countInputs };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     console.log("-> Mensaje recibido en content.ts:", message);
     if (message.action === 'GET_FIELDS') {
         const fields = strategy1();
-        sendResponse(fields);
+        if (fields.countInputs === fields.fields.length) {
+            sendResponse(fields);
+        } else {
+            sendResponse({ fields: [], countInputs: 0 });
+        }
     }
     return true;
 });

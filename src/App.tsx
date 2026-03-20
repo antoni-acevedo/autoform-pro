@@ -17,7 +17,7 @@ export default function App() {
             return;
           }
           console.log("-> Campos encontrados:", res);
-          setFields(res);
+          setFields(res.fields);
         });
       } else {
         console.warn("-> No se encontró ningún tab activo válido para escanear.");
@@ -26,12 +26,29 @@ export default function App() {
 
   };
 
+  const renderField = (field: any, index: number) => {
+    if (field.input.type === "checkbox") {
+      return (
+        <div className="flex flex-row gap-2">
+          <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+          <label htmlFor={field.input.id}>{field.label.text}</label>
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex flex-col gap-2">
+          <label htmlFor={field.input.id}>{field.label.text}</label>
+          <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+        </div>
+      )
+    }
+  };
+
   useEffect(() => {
-    scan();
-    // const timer = setInterval(() => {
-    //   scan();
-    // }, 1000);
-    // return () => clearInterval(timer);
+    const interval = setInterval(() => {
+      scan();
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -43,8 +60,7 @@ export default function App() {
       <div className="flex flex-col gap-2">
         {fields.map((field, index) => (
           <div key={index} className="flex flex-col gap-2">
-            <label htmlFor={field.input.id}>{field.label.text}</label>
-            <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+            {renderField(field, index)}
           </div>
         ))}
       </div>
