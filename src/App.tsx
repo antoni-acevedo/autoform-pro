@@ -17,7 +17,7 @@ export default function App() {
             return;
           }
           console.log("-> Campos encontrados:", res);
-          setFields(res.fields);
+          setFields(res);
         });
       } else {
         console.warn("-> No se encontró ningún tab activo válido para escanear.");
