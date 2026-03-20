@@ -27,21 +27,78 @@ export default function App() {
   };
 
   const renderField = (field: any, index: number) => {
-    if (field.input.type === "checkbox") {
-      return (
-        <div className="flex flex-row gap-2">
-          <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
-          <label htmlFor={field.input.id}>{field.label.text}</label>
-        </div>
-      )
-    } else {
+
+    // 🛠️ Sub-componente para mostrar la etiqueta recortada y el botón de copiar
+    const labelWithCopy = (
+      <div className="flex flex-row items-center gap-2 max-w-[150px] overflow-hidden">
+        <label htmlFor={field.input.id} className="truncate font-medium text-sm" title={field.label.text}>
+          {field.label.text}
+        </label>
+        {field.xpath && (
+          <button
+            onClick={() => navigator.clipboard.writeText(field.xpath)}
+            className="text-xs text-blue-500 hover:text-blue-700 cursor-pointer flex-shrink-0"
+            title="Copiar XPath"
+          >
+            📋
+          </button>
+        )}
+      </div>
+    );
+    const labelWithoutCopy = (
+      <div className="flex flex-row items-center gap-2 max-w-full overflow-hidden">
+        <label htmlFor={field.input.id} className="truncate font-medium text-sm" title={field.label.text}>
+          {field.label.text}
+        </label>
+      </div>
+    );
+
+    const isTextInput = ["text", "tel", "number", "email", "password", "url"].includes(field.input.type);
+
+    if (isTextInput) {
       return (
         <div className="flex flex-col gap-2">
-          <label htmlFor={field.input.id}>{field.label.text}</label>
-          <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+          {labelWithoutCopy}
+          <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+        </div>
+      )
+    } else if (field.input.type === "select-one") {
+      return (
+        <div className="flex flex-col gap-2">
+          {labelWithoutCopy}
+          <select id={field.input.id} name={field.input.name} defaultValue={field.input.value} disabled={field.input.disabled}>
+            {field.input.options && field.input.options.map((option: any, optIndex: number) => (
+              <option key={optIndex} value={option.value}>{option.text}</option>
+            ))}
+          </select>
         </div>
       )
     }
+
+    if (field.input.type === "textarea") {
+      return (
+        <div className="flex flex-col gap-2">
+          {labelWithoutCopy}
+          <textarea id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+        </div>
+      )
+    }
+
+    if (field.input.type === "checkbox") {
+      return (
+        <div className="flex flex-row gap-2 items-center">
+          <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+          {labelWithCopy}
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col gap-2">
+        {labelWithoutCopy}
+        <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+      </div>
+    )
   };
 
   useEffect(() => {

@@ -1,54 +1,71 @@
-function strategy1(processedInputs, fields) {
-  const getDivs = document.querySelectorAll("div");
-  getDivs.forEach((div) => {
-    const label = div.querySelector("label");
-    const input = div.querySelector("input");
-    if (label && input) {
-      if (processedInputs.has(input)) return;
-      fields.push({
-        label: { text: label.textContent?.trim() || "" },
-        input: {
-          value: input.value || "",
-          name: input.name || input.id || "sin-nombre",
-          type: input.type || "text",
-          placeholder: input.placeholder || "",
-          id: input.id || "sin-id",
-          disabled: input.disabled || false
-        }
-      });
-      processedInputs.add(input);
+function getXPath(element) {
+  let path = "";
+  for (let current = element; current && current.nodeType === 1; current = current.parentNode) {
+    let index = 1;
+    for (let sib = current.previousSibling; sib; sib = sib.previousSibling) {
+      if (sib.nodeType === 1 && sib.nodeName === current.nodeName) index++;
     }
-  });
-}
-function strategy2(processedInputs, fields) {
-  const allInputs = document.querySelectorAll("input");
-  allInputs.forEach((input) => {
-    if (!processedInputs.has(input) && input.placeholder) {
-      console.log("-> Estrategia 2 (Placeholder) encontrada para:", input);
-      fields.push({
-        label: { text: input.placeholder.trim() + " (Placeholder)" },
-        input: {
-          value: input.value || "",
-          name: input.name || input.id || "sin-nombre",
-          type: input.type || "text",
-          placeholder: input.placeholder || "",
-          id: input.id || "sin-id",
-          disabled: input.disabled || false
-        }
-      });
-      processedInputs.add(input);
-    }
-  });
+    const tagName = current.nodeName.toLowerCase();
+    path = `/${tagName}[${index}]` + path;
+  }
+  return path;
 }
 function getFields() {
   const fields = [];
-  const processedInputs = /* @__PURE__ */ new Set();
-  strategy1(processedInputs, fields);
-  const totalPageInputs = document.querySelectorAll("input").length;
-  if (fields.length < totalPageInputs) {
-    console.log(`-> Faltan ${totalPageInputs - fields.length} inputs. Probando Estrategia 2...`);
-    strategy2(processedInputs, fields);
-  }
+  const allInputs = document.querySelectorAll("input, select, textarea");
+  allInputs.forEach((input) => {
+    let labelText = "sin-label";
+    let label = null;
+    if (input.id) {
+      label = document.querySelector(`label[for="${input.id}"]`);
+    }
+    if (!label) {
+      const closestParent = input.closest("div");
+      label = closestParent ? closestParent.querySelector("label") : null;
+    }
+    const labelTextFromDOM = label ? label.textContent?.trim() : "";
+    if (labelTextFromDOM) {
+      labelText = labelTextFromDOM;
+    } else if (input.id || input.name) {
+      labelText = input.id || input.name;
+    } else if (input.placeholder) {
+      labelText = input.placeholder.trim();
+    } else if (input.value && input.type !== "checkbox") {
+      labelText = input.value;
+    } else if (input.tagName.toLowerCase() === "select") {
+      const firstOption = input.querySelector("option");
+      if (firstOption) {
+        labelText = firstOption.textContent?.trim() || "sin-label";
+      }
+    }
+    if (labelText === "sin-label" && input.type === "checkbox") {
+      labelText = `Checkbox(${getXPath(input)})`;
+    }
+    const options = [];
+    if (input.tagName.toLowerCase() === "select") {
+      input.querySelectorAll("option").forEach((opt) => {
+        options.push({
+          value: opt.value || "",
+          text: opt.textContent?.trim() || ""
+        });
+      });
+    }
+    fields.push({
+      label: { text: labelText },
+      xpath: getXPath(input),
+      // 👈 Añadimos XPath para que se pueda copiar en el UI
+      input: {
+        value: input.value || "",
+        name: input.name || input.id || "sin-nombre",
+        type: input.type || input.tagName.toLowerCase(),
+        placeholder: input.placeholder || "",
+        id: input.id || "sin-id",
+        disabled: input.disabled || false,
+        options: options.length > 0 ? options : void 0
+        // 👈 Añadimos la clave de opciones
+      }
+    });
+  });
   return fields;
 }
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
