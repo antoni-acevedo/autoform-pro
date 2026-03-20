@@ -14,3 +14,22 @@
 .status-active-glow {
   text-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
 }
+
+/* 💈 Custom Scrollbars (Chrome Extension Dynamic Styles) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3); /* violet-500 con transparencia */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6); /* Color más sólido al posar el mouse */
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 export default function App() {
   const [fields, setFields] = useState<any[]>([]);
+  const [isOpen, setIsOpen] = useState<boolean>(false); // 👈 Control del acordeón
 
   const scan = () => {
 
@@ -89,13 +90,42 @@ export default function App() {
         FormProv <span className="text-slate-500 font-normal text-sm">v2</span>
       </h1>
 
-      <div className="flex flex-col gap-2">
-        {fields.map((field, index) => (
-          <div key={index} className="flex flex-col gap-2">
-            {renderField(field, index)}
+      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-xl overflow-hidden shadow-xl">
+        {/* Cabecera / Trigger del Acordeón */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-800/40 transition-colors duration-200 border-b border-slate-800/50"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-200 text-sm">Campos Detectados</span>
+            <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 text-xs rounded-full border border-violet-500/30 font-medium">
+              {fields.length}
+            </span>
           </div>
-        ))}
+          <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Contenido Colapsable */}
+        <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[400px] overflow-y-auto p-4 flex flex-col gap-3' : 'max-h-0 overflow-hidden'}`}>
+          {fields.map((field, index) => (
+            <div key={index} className="flex flex-col gap-1">
+              {renderField(field, index)}
+            </div>
+          ))}
+        </div>
       </div>
+
+      <button
+        onClick={() => chrome.storage.local.set({ fields })}
+        className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
+      >
+        <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span>Guardar Campos</span>
+      </button>
 
     </div>
   );
