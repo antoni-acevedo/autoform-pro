@@ -28,45 +28,19 @@ export default function App() {
 
   const renderField = (field: any, index: number) => {
 
-    // 🛠️ Sub-componente para mostrar la etiqueta recortada y el botón de copiar
-    const labelWithCopy = (
-      <div className="flex flex-row items-center gap-2 max-w-[150px] overflow-hidden">
-        <label htmlFor={field.input.id} className="truncate font-medium text-sm" title={field.label.text}>
-          {field.label.text}
-        </label>
-        {field.xpath && (
-          <button
-            onClick={() => navigator.clipboard.writeText(field.xpath)}
-            className="text-xs text-blue-500 hover:text-blue-700 cursor-pointer flex-shrink-0"
-            title="Copiar XPath"
-          >
-            📋
-          </button>
-        )}
-      </div>
-    );
-    const labelWithoutCopy = (
-      <div className="flex flex-row items-center gap-2 max-w-full overflow-hidden">
-        <label htmlFor={field.input.id} className="truncate font-medium text-sm" title={field.label.text}>
-          {field.label.text}
-        </label>
-      </div>
-    );
 
-    const isTextInput = ["text", "tel", "number", "email", "password", "url"].includes(field.input.type);
+    const inputClasses = "w-full px-3 py-2 border border-slate-800 bg-slate-950 text-slate-100 placeholder-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm";
 
-    if (isTextInput) {
+    if (field.input.type === "text" || field.input.type === "tel" || field.input.type === "number" || field.input.type === "email" || field.input.type === "password" || field.input.type === "url") {
       return (
         <div className="flex flex-col gap-2">
-          {labelWithoutCopy}
-          <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+          <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value || ""} onChange={() => {}} placeholder={field.label.text} disabled={field.input.disabled} className={inputClasses} />
         </div>
       )
     } else if (field.input.type === "select-one") {
       return (
         <div className="flex flex-col gap-2">
-          {labelWithoutCopy}
-          <select id={field.input.id} name={field.input.name} defaultValue={field.input.value} disabled={field.input.disabled}>
+          <select id={field.input.id} name={field.input.name} value={field.input.value || ""} onChange={() => {}} disabled={field.input.disabled} className={inputClasses}>
             {field.input.options && field.input.options.map((option: any, optIndex: number) => (
               <option key={optIndex} value={option.value}>{option.text}</option>
             ))}
@@ -78,27 +52,26 @@ export default function App() {
     if (field.input.type === "textarea") {
       return (
         <div className="flex flex-col gap-2">
-          {labelWithoutCopy}
-          <textarea id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+          <textarea id={field.input.id} name={field.input.name} value={field.input.value || ""} onChange={() => {}} placeholder={field.label.text} disabled={field.input.disabled} className={inputClasses + " resize-y min-h-[80px]"} />
         </div>
       )
     }
 
     if (field.input.type === "checkbox") {
+      const isChecked = field.input.value === "true" || field.input.value === "on" || field.input.value === true;
       return (
         <div className="flex flex-row gap-2 items-center">
-          <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
-          {labelWithCopy}
+          <input type={field.input.type} id={field.input.id} name={field.input.name} checked={isChecked} onChange={() => {}} disabled={field.input.disabled} className="rounded border-slate-700 bg-slate-900 text-violet-500 focus:ring-violet-500 h-4 w-4" />
+          <span className="text-slate-300 text-sm font-medium max-w-[200px] truncate">{field.label.text}</span>
         </div>
       )
     }
 
     return (
       <div className="flex flex-col gap-2">
-        {labelWithoutCopy}
-        <input type={field.input.type} id={field.input.id} name={field.input.name} defaultValue={field.input.value} placeholder={field.input.placeholder} disabled={field.input.disabled} />
+        <input type={field.input.type} id={field.input.id} name={field.input.name} value={field.input.value || ""} onChange={() => {}} placeholder={field.label.text} disabled={field.input.disabled} className={inputClasses} />
       </div>
-    )
+    );
   };
 
   useEffect(() => {

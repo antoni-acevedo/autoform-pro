@@ -21,36 +21,12 @@ function getFields() {
     allInputs.forEach((input: any) => {
         let labelText = "sin-label";
 
-        // 🟢 Estrategia 1: Buscar <label for="id"> (Nativa HTML) o en el contenedor DIV cercano
-        let label: any = null;
-        
-        if (input.id) {
-            label = document.querySelector(`label[for="${input.id}"]`);
-        }
-
-        if (!label) {
-            const closestParent = input.closest('div');
-            label = closestParent ? closestParent.querySelector('label') : null;
-        }
-
-        const labelTextFromDOM = label ? label.textContent?.trim() : "";
-
-        if (labelTextFromDOM) {
-            labelText = labelTextFromDOM;
-        }
-        // 🟠 Estrategia 2: ID o Nombre si no hay <label> con texto
-        else if (input.id || input.name) {
-            labelText = input.id || input.name;
-        }
-        // 🟡 Estrategia 3: Placeholder si no hay ID/Nombre
-        else if (input.placeholder) {
+        if (input.placeholder) {
             labelText = input.placeholder.trim();
         }
-        // 🟢 Estrategia 4: Value si no hay Placeholder (excluyendo Checkboxes)
-        else if (input.value && input.type !== "checkbox") {
-            labelText = input.value;
+        else if (input.id) {
+            labelText = input.id;
         }
-        // 🔵 Estrategia 5: Fallback para Selects (primera opción)
         else if (input.tagName.toLowerCase() === 'select') {
             const firstOption = input.querySelector('option');
             if (firstOption) {
@@ -58,10 +34,11 @@ function getFields() {
             }
         }
 
-        // 🟢 Estrategia 5 (De emergencia para Checkboxes sin nada)
-        if (labelText === "sin-label" && input.type === "checkbox") {
-            labelText = `Checkbox(${getXPath(input)})`;
+        // 🧪 Estrategia de Emergencia: XPath
+        if (labelText === "sin-label") {
+            labelText = `XPath(${getXPath(input)})`;
         }
+
 
         // 📥 Extraemos opciones si es un <select>
         const options: any[] = [];
@@ -77,7 +54,6 @@ function getFields() {
         // Empujamos el campo (SIEMPRE EN ORDEN)
         fields.push({
             label: { text: labelText },
-            xpath: getXPath(input), // 👈 Añadimos XPath para que se pueda copiar en el UI
             input: {
                 value: input.value || "",
                 name: input.name || input.id || "sin-nombre",

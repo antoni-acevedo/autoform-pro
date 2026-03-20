@@ -15,31 +15,18 @@ function getFields() {
   const allInputs = document.querySelectorAll("input, select, textarea");
   allInputs.forEach((input) => {
     let labelText = "sin-label";
-    let label = null;
-    if (input.id) {
-      label = document.querySelector(`label[for="${input.id}"]`);
-    }
-    if (!label) {
-      const closestParent = input.closest("div");
-      label = closestParent ? closestParent.querySelector("label") : null;
-    }
-    const labelTextFromDOM = label ? label.textContent?.trim() : "";
-    if (labelTextFromDOM) {
-      labelText = labelTextFromDOM;
-    } else if (input.id || input.name) {
-      labelText = input.id || input.name;
-    } else if (input.placeholder) {
+    if (input.placeholder) {
       labelText = input.placeholder.trim();
-    } else if (input.value && input.type !== "checkbox") {
-      labelText = input.value;
+    } else if (input.id) {
+      labelText = input.id;
     } else if (input.tagName.toLowerCase() === "select") {
       const firstOption = input.querySelector("option");
       if (firstOption) {
         labelText = firstOption.textContent?.trim() || "sin-label";
       }
     }
-    if (labelText === "sin-label" && input.type === "checkbox") {
-      labelText = `Checkbox(${getXPath(input)})`;
+    if (labelText === "sin-label") {
+      labelText = `XPath(${getXPath(input)})`;
     }
     const options = [];
     if (input.tagName.toLowerCase() === "select") {
@@ -52,8 +39,6 @@ function getFields() {
     }
     fields.push({
       label: { text: labelText },
-      xpath: getXPath(input),
-      // 👈 Añadimos XPath para que se pueda copiar en el UI
       input: {
         value: input.value || "",
         name: input.name || input.id || "sin-nombre",
