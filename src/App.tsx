@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useSaveFields } from "./hooks/saveFields";
 
 export default function App() {
   const [fields, setFields] = useState<any[]>([]);
+  const { saveFields, loading, success, loadFields, clearFields } = useSaveFields(); // 🔮 Usar hook de estados
   const [isOpen, setIsOpen] = useState<boolean>(false); // 👈 Control del acordeón
 
   const scan = () => {
@@ -118,8 +120,9 @@ export default function App() {
       </div>
 
       <button
-        onClick={() => chrome.storage.local.set({ fields })}
-        className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
+        onClick={() => saveFields(fields)}
+        disabled={loading}
+        className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -127,6 +130,27 @@ export default function App() {
         <span>Guardar Campos</span>
       </button>
 
+      <button
+        onClick={() => loadFields()}
+        disabled={loading}
+        className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span>Cargar Campos</span>
+      </button>
+
+      <button
+        onClick={() => clearFields()}
+        disabled={loading}
+        className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <svg className="w-4 h-4 text-white group-hover:translate-y-0.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span>Limpiar Campos</span>
+      </button>
     </div>
   );
 }
