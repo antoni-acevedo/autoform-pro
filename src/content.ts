@@ -69,7 +69,7 @@ function getLabelInfo(input: any): { text: string, method: string } {
     if (input.id) {
         return { text: input.id, method: "id" };
     }
-    
+
     // Fallback absoluto por XPath
     return { text: getXPath(input), method: "xpath" };
 }
@@ -124,10 +124,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === 'GET_FIELDS') {
         const fields = getFields();
         sendResponse(fields);
-    } 
+    }
     else if (message.action === 'FILL_FIELDS') {
         const data = message.data || [];
-        
+
         const fillSequentially = async () => {
             const usedElements = new Set<any>(); // 🛡️ Evitar que 1 input genérico se robe todos los datos idénticos
 
@@ -168,13 +168,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         const candidate = candidates[i];
                         if (candidate.type === "file") continue;
                         if (usedElements.has(candidate)) continue; // 🛡️ Ya lo rellenamos, pasamos al siguiente clon!
-                        
+
                         let score = 0;
-                        
+
                         // Matches Estrictos
                         if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
                         if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
-                        
+
                         // Matches Fuzzy
                         if (savedField.input.id && isFuzzyMatch(candidate.id, savedField.input.id)) score += 80;
                         if (savedField.input.name && isFuzzyMatch(candidate.name, savedField.input.name)) score += 70;
@@ -185,11 +185,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
                         if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
                         if (savedField.input.domIndex !== undefined && i === savedField.input.domIndex) score += 5;
-                        
+
                         // Refuerzo Selects
                         if (candidate.tagName === "SELECT" && savedField.input.options) {
-                            const candidateOptions = Array.from(candidate.querySelectorAll('option')).map((o:any)=>o.textContent?.trim());
-                            const savedOptions = savedField.input.options.map((o:any)=>o.text);
+                            const candidateOptions = Array.from(candidate.querySelectorAll('option')).map((o: any) => o.textContent?.trim());
+                            const savedOptions = savedField.input.options.map((o: any) => o.text);
                             if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
                                 score += 30;
                             }
