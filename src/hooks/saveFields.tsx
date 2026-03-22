@@ -21,21 +21,39 @@ export const useSaveFields = () => {
                     }
                 }
 
-                // 🤝 2. Fusionamos la biblioteca con los nuevos campos (sin machacar)
+                // 🌟 Buscador Léxico de Variantes para Autocorreción de Formatos
+                const isFuzzyMatch = (a: string, b: string) => {
+                    if (!a || !b) return false;
+                    const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_\-]+/g, "");
+                    return normalize(a) === normalize(b);
+                };
+
+                // 🤝 2. Fusionamos la biblioteca con los nuevos campos (Actualizando los viejos inteligentemente)
                 const mergedFields = [...existingFields];
 
                 fields.forEach((newField: any) => {
-                    // 🛡️ Búsqueda estricta multidimensional
-                    const index = mergedFields.findIndex(f => 
-                        f.label.text === newField.label.text &&
-                        f.input.id === newField.input.id &&
-                        f.input.className === newField.input.className &&
-                        f.input.domIndex === newField.input.domIndex
-                    );
+                    // 🛡️ Búsqueda de Actualidad (Prioridad: ID > Name > XPath > Todo lo demás)
+                    const index = mergedFields.findIndex(f => {
+                        if (newField.input.id && f.input.id) {
+                            return isFuzzyMatch(f.input.id, newField.input.id);
+                        }
+                        if (newField.input.name && f.input.name) {
+                            return isFuzzyMatch(f.input.name, newField.input.name);
+                        }
+                        if (newField.label.method === "xpath" && f.label.method === "xpath") {
+                            return f.label.text === newField.label.text;
+                        }
+                        // Si carecen de identificadores fiables, se usa coincidencia estricta espacial
+                        return isFuzzyMatch(f.label.text, newField.label.text) &&
+                               f.input.className === newField.input.className &&
+                               f.input.domIndex === newField.input.domIndex;
+                    });
 
                     if (index !== -1) {
-                        mergedFields[index].input.value = newField.input.value;
+                        // 🔄 Si encontramos un primo evolutivo, ABSORBEMOS su conocimiento moderno completo (auto-sanación)
+                        mergedFields[index] = newField;
                     } else {
+                        // 📥 Si es un campo totalmente nuevo, lo agregamos a la biblioteca
                         mergedFields.push(newField);
                     }
                 });
