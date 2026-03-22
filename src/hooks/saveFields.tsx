@@ -25,7 +25,7 @@ export const useSaveFields = () => {
                 const mergedFields = [...existingFields];
 
                 fields.forEach((newField: any) => {
-                    // 🛡️ Búsqueda estricta multidimensional para que campos con el mismo label.text no se machaquen
+                    // 🛡️ Búsqueda estricta multidimensional
                     const index = mergedFields.findIndex(f => 
                         f.label.text === newField.label.text &&
                         f.input.id === newField.input.id &&
@@ -34,10 +34,8 @@ export const useSaveFields = () => {
                     );
 
                     if (index !== -1) {
-                        // 🔄 Si ya existe el campo EXACTO, actualizamos su valor
                         mergedFields[index].input.value = newField.input.value;
                     } else {
-                        // 📥 Si es un campo totalmente nuevo, lo agregamos a la biblioteca
                         mergedFields.push(newField);
                     }
                 });

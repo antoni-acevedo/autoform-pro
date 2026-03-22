@@ -20,24 +20,28 @@ function fillElementValue(element, value) {
       element.checked = isChecked;
     } else {
       let setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      let actualValue = value;
       if (element.tagName === "SELECT") {
         setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+        if (element.options) {
+          for (let i = 0; i < element.options.length; i++) {
+            if (element.options[i].value === value || element.options[i].textContent?.trim() === value) {
+              element.selectedIndex = i;
+              actualValue = element.options[i].value;
+              break;
+            }
+          }
+        }
       } else if (element.tagName === "TEXTAREA") {
         setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
       }
-      if (setter) setter.call(element, value);
-      else element.value = value;
-      if (element.tagName === "SELECT" && element.options) {
-        for (let i = 0; i < element.options.length; i++) {
-          if (element.options[i].value === value || element.options[i].textContent?.trim() === value) {
-            element.selectedIndex = i;
-            break;
-          }
-        }
-      }
+      if (setter) setter.call(element, actualValue);
+      else element.value = actualValue;
     }
+    element.dispatchEvent(new Event("focus", { bubbles: true }));
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.dispatchEvent(new Event("blur", { bubbles: true }));
   } catch (error) {
     console.warn("-> Error al usar setter nativo, cayendo en fallback:", error);
     if (element.type === "checkbox") {
@@ -98,53 +102,74 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse(fields);
   } else if (message.action === "FILL_FIELDS") {
     const data = message.data || [];
-    data.forEach((savedField) => {
-      const targetLabel = savedField.label.text;
-      const targetMethod = savedField.label.method;
-      const valueToSet = savedField.input.value;
-      let current = null;
-      let highestScore = 0;
-      const allInputs = document.querySelectorAll("input, select, textarea");
-      const candidates = Array.from(allInputs);
-      for (let i = 0; i < candidates.length; i++) {
-        const candidate = candidates[i];
-        if (candidate.type === "file") continue;
-        let score = 0;
-        if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
-        if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
-        if (targetMethod === "placeholder" && candidate.placeholder === targetLabel) score += 80;
-        if (targetMethod === "id" && candidate.id === targetLabel) score += 80;
-        if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
-        if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
-        if (savedField.input.domIndex !== void 0 && i === savedField.input.domIndex) score += 5;
-        if (candidate.tagName === "SELECT" && savedField.input.options) {
-          const candidateOptions = Array.from(candidate.querySelectorAll("option")).map((o) => o.textContent?.trim());
-          const savedOptions = savedField.input.options.map((o) => o.text);
-          if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
-            score += 30;
+    const fillSequentially = async () => {
+      const usedElements = /* @__PURE__ */ new Set();
+      for (const savedField of data) {
+        const targetLabel = savedField.label.text;
+        const targetMethod = savedField.label.method;
+        const valueToSet = savedField.input.value;
+        let current = null;
+        if (targetMethod === "xpath") {
+          try {
+            let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
+            const result = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            const xpathNode = result.singleNodeValue;
+            if (xpathNode && !usedElements.has(xpathNode)) {
+              current = xpathNode;
+            }
+          } catch (e) {
+            console.warn("Fallback primario de XPath falló:", e);
           }
         }
-        if (score > highestScore && score >= 20) {
-          highestScore = score;
-          current = candidate;
+        if (!current) {
+          let highestScore = 0;
+          const allInputs = document.querySelectorAll("input, select, textarea");
+          const candidates = Array.from(allInputs);
+          const isFuzzyMatch = (a, b) => {
+            if (!a || !b) return false;
+            const normalize = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_\-]+/g, "");
+            return normalize(a) === normalize(b);
+          };
+          for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[i];
+            if (candidate.type === "file") continue;
+            if (usedElements.has(candidate)) continue;
+            let score = 0;
+            if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
+            if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
+            if (savedField.input.id && isFuzzyMatch(candidate.id, savedField.input.id)) score += 80;
+            if (savedField.input.name && isFuzzyMatch(candidate.name, savedField.input.name)) score += 70;
+            if (targetMethod === "placeholder" && isFuzzyMatch(candidate.placeholder, targetLabel)) score += 60;
+            if (targetMethod === "id" && isFuzzyMatch(candidate.id, targetLabel)) score += 60;
+            if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
+            if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
+            if (savedField.input.domIndex !== void 0 && i === savedField.input.domIndex) score += 5;
+            if (candidate.tagName === "SELECT" && savedField.input.options) {
+              const candidateOptions = Array.from(candidate.querySelectorAll("option")).map((o) => o.textContent?.trim());
+              const savedOptions = savedField.input.options.map((o) => o.text);
+              if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
+                score += 30;
+              }
+            }
+            if (score > highestScore && score >= 30) {
+              highestScore = score;
+              current = candidate;
+            }
+          }
+        }
+        if (current) {
+          console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
+          usedElements.add(current);
+          fillElementValue(current, valueToSet);
+          await new Promise((r) => setTimeout(r, 100));
+        } else {
+          console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
         }
       }
-      if (!current && targetMethod === "xpath") {
-        try {
-          let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
-          current = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        } catch (e) {
-          console.warn("Fallback de XPath falló:", e);
-        }
-      }
-      if (current) {
-        console.log(`-> Rellenando ${current.tagName} (${targetLabel} | Puntos: ${highestScore}) con:`, valueToSet);
-        fillElementValue(current, valueToSet);
-      } else {
-        console.warn(`-> No se encontró match para: ${targetLabel} (Método: ${targetMethod})`);
-      }
-    });
-    sendResponse({ success: true, message: "Campos rellenados" });
+      sendResponse({ success: true, message: "Campos rellenados" });
+    };
+    fillSequentially();
+    return true;
   }
   return true;
 });

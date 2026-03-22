@@ -23,29 +23,33 @@ function fillElementValue(element: any, value: any) {
             element.checked = isChecked;
         } else {
             let setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+            let actualValue = value;
+
             if (element.tagName === "SELECT") {
                 setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")?.set;
+                // 🎯 Refuerzo exclusivo para <select>: Asegurar index correcto primero!
+                if (element.options) {
+                    for (let i = 0; i < element.options.length; i++) {
+                        if (element.options[i].value === value || element.options[i].textContent?.trim() === value) {
+                            element.selectedIndex = i;
+                            actualValue = element.options[i].value; // Extraer el valor real de la opción
+                            break;
+                        }
+                    }
+                }
             } else if (element.tagName === "TEXTAREA") {
                 setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
             }
 
-            if (setter) setter.call(element, value);
-            else element.value = value;
-
-            // 🎯 Refuerzo exclusivo para <select>: Asegurar index correcto
-            if (element.tagName === "SELECT" && element.options) {
-                for (let i = 0; i < element.options.length; i++) {
-                    if (element.options[i].value === value || element.options[i].textContent?.trim() === value) {
-                        element.selectedIndex = i;
-                        break;
-                    }
-                }
-            }
+            if (setter) setter.call(element, actualValue);
+            else element.value = actualValue;
         }
 
-        // 💥 Disparar eventos para que el framework se entere del cambio
+        // 💥 Tormenta de Eventos para obligar a React/Angular a guardar el estado de inmediato
+        element.dispatchEvent(new Event('focus', { bubbles: true }));
         element.dispatchEvent(new Event('input', { bubbles: true }));
         element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.dispatchEvent(new Event('blur', { bubbles: true }));
 
     } catch (error) {
         console.warn("-> Error al usar setter nativo, cayendo en fallback:", error);
@@ -124,73 +128,98 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     else if (message.action === 'FILL_FIELDS') {
         const data = message.data || [];
         
-        data.forEach((savedField: any) => {
-            const targetLabel = savedField.label.text;
-            const targetMethod = savedField.label.method;
-            const valueToSet = savedField.input.value;
+        const fillSequentially = async () => {
+            const usedElements = new Set<any>(); // 🛡️ Evitar que 1 input genérico se robe todos los datos idénticos
 
-            let current: any = null;
-            let highestScore = 0;
+            for (const savedField of data) {
+                const targetLabel = savedField.label.text;
+                const targetMethod = savedField.label.method;
+                const valueToSet = savedField.input.value;
 
-            const allInputs = document.querySelectorAll('input, select, textarea');
-            const candidates = Array.from(allInputs) as any[];
+                let current: any = null;
 
-            // 🎯 Algoritmo de Búsqueda Ponderada
-            for (let i = 0; i < candidates.length; i++) {
-                const candidate = candidates[i];
-                if (candidate.type === "file") continue;
-                
-                let score = 0;
-                
-                // 1️⃣ Matches Exactos (casi garantizan que es el mismo)
-                if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
-                if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
-                
-                // 2️⃣ Prioridad por el Mismo Método de Detección
-                if (targetMethod === "placeholder" && candidate.placeholder === targetLabel) score += 80;
-                if (targetMethod === "id" && candidate.id === targetLabel) score += 80;
-
-                // 3️⃣ Refuerzo Estructural para Checkboxes y Selects sin Atributos
-                if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
-                if (savedField.input.className && candidate.className === savedField.input.className) score += 20; // Clases Tailwind ayudan
-                if (savedField.input.domIndex !== undefined && i === savedField.input.domIndex) score += 5;      // Misma posición DOM
-                
-                // 4️⃣ Bonus Exclusivo para <select>: Coincidencia de Hijos Option
-                if (candidate.tagName === "SELECT" && savedField.input.options) {
-                    const candidateOptions = Array.from(candidate.querySelectorAll('option')).map((o:any)=>o.textContent?.trim());
-                    const savedOptions = savedField.input.options.map((o:any)=>o.text);
-                    if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
-                        score += 30;
+                // 🎯 1. Intento Primario y Absoluto: XPath Directo (Si fue guardado por XPath)
+                if (targetMethod === "xpath") {
+                    try {
+                        let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
+                        const result = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                        const xpathNode = result.singleNodeValue;
+                        if (xpathNode && !usedElements.has(xpathNode)) {
+                            current = xpathNode;
+                        }
+                    } catch (e) {
+                        console.warn("Fallback primario de XPath falló:", e);
                     }
                 }
 
-                // Superar el umbral y tomar el mejor candidato
-                if (score > highestScore && score >= 20) {
-                    highestScore = score;
-                    current = candidate;
+                // 🎯 2. Si es Método normal (placeholder, id) o el XPath falló, vamos a Puntuación Ponderada
+                if (!current) {
+                    let highestScore = 0;
+                    const allInputs = document.querySelectorAll('input, select, textarea');
+                    const candidates = Array.from(allInputs) as any[];
+
+                    const isFuzzyMatch = (a: string, b: string) => {
+                        if (!a || !b) return false;
+                        const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_\-]+/g, "");
+                        return normalize(a) === normalize(b);
+                    };
+
+                    for (let i = 0; i < candidates.length; i++) {
+                        const candidate = candidates[i];
+                        if (candidate.type === "file") continue;
+                        if (usedElements.has(candidate)) continue; // 🛡️ Ya lo rellenamos, pasamos al siguiente clon!
+                        
+                        let score = 0;
+                        
+                        // Matches Estrictos
+                        if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
+                        if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
+                        
+                        // Matches Fuzzy
+                        if (savedField.input.id && isFuzzyMatch(candidate.id, savedField.input.id)) score += 80;
+                        if (savedField.input.name && isFuzzyMatch(candidate.name, savedField.input.name)) score += 70;
+                        if (targetMethod === "placeholder" && isFuzzyMatch(candidate.placeholder, targetLabel)) score += 60;
+                        if (targetMethod === "id" && isFuzzyMatch(candidate.id, targetLabel)) score += 60;
+
+                        // Refuerzo Estructural
+                        if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
+                        if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
+                        if (savedField.input.domIndex !== undefined && i === savedField.input.domIndex) score += 5;
+                        
+                        // Refuerzo Selects
+                        if (candidate.tagName === "SELECT" && savedField.input.options) {
+                            const candidateOptions = Array.from(candidate.querySelectorAll('option')).map((o:any)=>o.textContent?.trim());
+                            const savedOptions = savedField.input.options.map((o:any)=>o.text);
+                            if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
+                                score += 30;
+                            }
+                        }
+
+                        // Superar el umbral estricto para evitar falsos positivos (+30 asegura que al menos coincidió tipo + clase)
+                        if (score > highestScore && score >= 30) {
+                            highestScore = score;
+                            current = candidate;
+                        }
+                    }
                 }
-            }
 
-            // 🤖 Búsqueda de Emergencia (Si el scoring falló, pero el guardado original decía usar XPath)
-            if (!current && targetMethod === "xpath") {
-                try {
-                    let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
-                    current = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-                } catch (e) {
-                    console.warn("Fallback de XPath falló:", e);
+                // 🚀 Rellenar el campo y bloquearlo para el siguiente loop
+                if (current) {
+                    console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
+                    usedElements.add(current);
+                    fillElementValue(current, valueToSet);
+                    // ⏱️ Pequeña pausa de 100ms para permitir a React/Angular comitear el DOM
+                    await new Promise(r => setTimeout(r, 100));
+                } else {
+                    console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
                 }
-            }
+            } // fin for
 
-            // 🚀 Rellenar el campo si se encontró algo sólido
-            if (current) {
-                console.log(`-> Rellenando ${current.tagName} (${targetLabel} | Puntos: ${highestScore}) con:`, valueToSet);
-                fillElementValue(current, valueToSet);
-            } else {
-                console.warn(`-> No se encontró match para: ${targetLabel} (Método: ${targetMethod})`);
-            }
-        });
+            sendResponse({ success: true, message: "Campos rellenados" });
+        };
 
-        sendResponse({ success: true, message: "Campos rellenados" });
+        fillSequentially();
+        return true; // Keep message channel open for async execution
     }
     return true;
 });
