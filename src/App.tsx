@@ -69,14 +69,14 @@ export default function App() {
             setFields(res);
 
             // Vigía de Mutaciones DOM Reales (El mejor detector de SPAs, Modales y Angular)
-            const signature = res.map((f: any) => f.input.id || f.input.name || f.input.className).join(",");
+            const signature = res.map((f: any) => f.input.id || f.input.name || f.input.className || (f.input.options ? f.input.options.length : 0)).join(",");
             if (signature !== previousFieldsSignatureRef.current) {
               const inicial = previousFieldsSignatureRef.current === "";
               previousFieldsSignatureRef.current = signature;
               
               if (!inicial && autoLoadRef.current && res.length > 0 && !runInBackgroundRef.current) {
-                // Inyección inmediata (sin delay) porque los inputs ya existen genuinamente
-                loadFields();
+                // ⏱️ Otorga 600ms a React/Angular para asentar sus variables de estado internas antes de forzar el autocompletado en el select recién construido
+                setTimeout(() => loadFields(), 600);
               }
             }
           }

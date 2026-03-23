@@ -213,8 +213,8 @@ const fillSequentially = async (data: any[]) => {
                     console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
                     usedElements.add(current);
                     fillElementValue(current, valueToSet);
-                    // ⏱️ Pequeña pausa milimétrica para engañar el event loop de React sin torturar al usuario
-                    await new Promise(r => setTimeout(r, 5));
+                    // ⏱️ Pausa controlada para permitir a React/Angular asimilar Múltiples mutaciones sin bloquear la cola de Eventos
+                    await new Promise(r => setTimeout(r, 40));
                 } else {
                     console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
                 }
@@ -234,7 +234,7 @@ setInterval(() => {
             const currentInputs = Array.from(document.querySelectorAll('input, select, textarea'));
             if (currentInputs.length === 0) return;
             
-            const sig = currentInputs.map((e: any) => e.id || e.name || e.className || e.type).join(",");
+            const sig = currentInputs.map((e: any) => e.id || e.name || e.className || e.type || (e.tagName === "SELECT" ? e.options.length : 0)).join(",");
             if (sig !== lastContentSignature) {
                 const inicial = lastContentSignature === "";
                 lastContentSignature = sig;
@@ -242,7 +242,7 @@ setInterval(() => {
                 if (!inicial) {
                     try {
                         const parsed = JSON.parse(res.fields);
-                        fillSequentially(parsed);
+                        setTimeout(() => fillSequentially(parsed), 600); // Dar respiro al Event Loop de la SPA 
                     } catch(e) {}
                 }
             }

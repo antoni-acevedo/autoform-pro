@@ -73,10 +73,21 @@ export const useSaveFields = () => {
                     });
 
                     if (index !== -1) {
-                        // 🔄 Si encontramos un primo evolutivo, ABSORBEMOS su conocimiento moderno completo (auto-sanación)
-                        mergedFields[index] = newField;
+                        const oldVal = mergedFields[index].input.value;
+                        const newVal = newField.input.value;
+                        
+                        // 🛡️ ESCUDO ANTI-BORRADO: Evitar que el vaciado natural del DOM tras un F5 sobreescriba nuestra biblioteca de oro.
+                        const isEmpty = (newVal === "" || newVal === undefined || newVal === "false");
+                        const hasOldData = (oldVal !== "" && oldVal !== undefined && oldVal !== "false");
+                        
+                        if (isEmpty && hasOldData) {
+                            // Ignorar la sobreescritura (Preserva la memoria en caso de que AutoLoad fallara o el usuario recargara la página)
+                            // Nota: Para borrar un campo definitivamente ahora hay que usar el botón de la Papelera de la UI.
+                        } else {
+                            mergedFields[index] = newField;
+                        }
                     } else {
-                        // 📥 Si es un campo totalmente nuevo, lo agregamos a la biblioteca
+                        // 📥 Si es un campo totalmente nuevo en la página, lo agregamos intacto
                         mergedFields.push(newField);
                     }
                 });
