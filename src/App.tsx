@@ -52,7 +52,7 @@ export default function App() {
   const scan = () => {
     chrome.tabs.query({ active: true }, (tabs) => {
       const tab = tabs.find(t => t.url && !t.url.startsWith("chrome-extension://"));
-      
+
       if (tab?.url) {
         if (autoLoadRef.current && urlRef.current !== null && tab.url !== urlRef.current) {
           urlRef.current = tab.url;
@@ -73,7 +73,7 @@ export default function App() {
             if (signature !== previousFieldsSignatureRef.current) {
               const inicial = previousFieldsSignatureRef.current === "";
               previousFieldsSignatureRef.current = signature;
-              
+
               if (!inicial && autoLoadRef.current && res.length > 0 && !runInBackgroundRef.current) {
                 // ⏱️ Otorga 600ms a React/Angular para asentar sus variables de estado internas antes de forzar el autocompletado en el select recién construido
                 setTimeout(() => loadFields(), 600);
@@ -87,7 +87,7 @@ export default function App() {
 
   const renderField = (field: any, index: number) => {
     const inputClasses = "w-full px-3 py-2 border border-slate-800 bg-slate-950 text-slate-100 placeholder-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm";
-    
+
     if (field.input.type === "text" || field.input.type === "tel" || field.input.type === "number" || field.input.type === "email" || field.input.type === "password" || field.input.type === "url") {
       return (
         <div className="flex flex-col gap-2">
@@ -144,7 +144,7 @@ export default function App() {
     const handleTabUpdate = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
       if (changeInfo.status === "complete" && tab.active) {
         if (autoLoadRef.current && !runInBackgroundRef.current) {
-          setTimeout(() => loadFields(), 800); 
+          setTimeout(() => loadFields(), 800);
         }
       }
     };
@@ -165,8 +165,8 @@ export default function App() {
 
         <h2 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
           <svg className="w-5 h-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           Configuración Avanzada
         </h2>
@@ -192,7 +192,7 @@ export default function App() {
     <div className="w-screen min-h-screen bg-slate-950 text-slate-100 p-5 font-sans pb-10">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-          FormProv <span className="text-slate-500 font-normal text-sm">v2</span>
+          AutoFormPro
         </h1>
 
         <div className="flex items-center gap-1.5">

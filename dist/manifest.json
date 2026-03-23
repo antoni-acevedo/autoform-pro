@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AutoFormProv2",
+  "name": "AutoFormPro",
   "version": "1.0.0",
-  "description": "AutoFormProv2 by Antoni",
+  "description": "AutoFormPro by Antoni",
   "permissions": [
     "storage",
     "activeTab",
