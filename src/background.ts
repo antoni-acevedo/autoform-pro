@@ -77,6 +77,23 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
     }
 }
 
-// En TypeScript para extensiones, esto fuerza a TS a considerar el archivo
-// un módulo aislado y no chocar con variables globales.
+// ==========================================
+// 4. AUTOLOAD DE FONDO (WORKER MODE)
+// ==========================================
+// Soporta la inyección de la biblioteca al cambiar de pestaña o URL sin requerir el SidePanel Abierto.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if ((changeInfo.status === 'complete' || changeInfo.url) && tab.active) {
+        chrome.storage.local.get(['autoLoadPref', 'runInBackgroundPref', 'fields'], (res) => {
+            if (res.runInBackgroundPref && res.autoLoadPref && res.fields) {
+                try {
+                    const parsed = JSON.parse(res.fields);
+                    setTimeout(() => {
+                        chrome.tabs.sendMessage(tabId, { action: 'FILL_FIELDS', data: parsed }).catch(() => {});
+                    }, 1500);
+                } catch(e) {}
+            }
+        });
+    }
+});
+
 export {};

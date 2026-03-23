@@ -126,12 +126,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse(fields);
     }
     else if (message.action === 'FILL_FIELDS') {
-        const data = message.data || [];
+        fillSequentially(message.data || []);
+        sendResponse({ success: true, message: "Campos rellenados" });
+        return true; 
+    }
+    return true;
+});
 
-        const fillSequentially = async () => {
-            const usedElements = new Set<any>(); // 🛡️ Evitar que 1 input genérico se robe todos los datos idénticos
+const fillSequentially = async (data: any[]) => {
+    const usedElements = new Set<any>(); // 🛡️ Evitar que 1 input genérico se robe todos los datos idénticos
 
-            for (const savedField of data) {
+    for (const savedField of data) {
                 const targetLabel = savedField.label.text;
                 const targetMethod = savedField.label.method;
                 const valueToSet = savedField.input.value;
@@ -208,20 +213,41 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
                     usedElements.add(current);
                     fillElementValue(current, valueToSet);
-                    // ⏱️ Pequeña pausa de 100ms para permitir a React/Angular comitear el DOM
-                    await new Promise(r => setTimeout(r, 100));
+                    // ⏱️ Pequeña pausa milimétrica para engañar el event loop de React sin torturar al usuario
+                    await new Promise(r => setTimeout(r, 5));
                 } else {
                     console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
                 }
             } // fin for
+};
 
-            sendResponse({ success: true, message: "Campos rellenados" });
-        };
-
-        fillSequentially();
-        return true; // Keep message channel open for async execution
-    }
-    return true;
-});
+// ==========================================
+// BACKGROUND WORKER MODE (SPA MUTATION OBSERVER)
+// ==========================================
+let lastContentSignature = "";
+setInterval(() => {
+    chrome.storage.local.get(['autoLoadPref', 'runInBackgroundPref', 'fields'], (res) => {
+        // Solo actuar si el Panel de Control se durmió o si nos pide delegar el control a fondo
+        if (!res.runInBackgroundPref) return; 
+        
+        if (res.autoLoadPref && res.fields && res.fields.length > 5) {
+            const currentInputs = Array.from(document.querySelectorAll('input, select, textarea'));
+            if (currentInputs.length === 0) return;
+            
+            const sig = currentInputs.map((e: any) => e.id || e.name || e.className || e.type).join(",");
+            if (sig !== lastContentSignature) {
+                const inicial = lastContentSignature === "";
+                lastContentSignature = sig;
+                
+                if (!inicial) {
+                    try {
+                        const parsed = JSON.parse(res.fields);
+                        fillSequentially(parsed);
+                    } catch(e) {}
+                }
+            }
+        }
+    });
+}, 1000);
 
 export { };

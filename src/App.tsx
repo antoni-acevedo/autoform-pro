@@ -2,28 +2,30 @@ import { useEffect, useState, useRef } from "react";
 import { useSaveFields } from "./hooks/saveFields";
 
 export default function App() {
+  const [view, setView] = useState<"main" | "settings">("main");
   const [fields, setFields] = useState<any[]>([]);
   const { saveFields, loading, success, loadFields, clearFields, savedCount } = useSaveFields();
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const [autoSave, setAutoSave] = useState<boolean>(false);
   const [autoLoad, setAutoLoad] = useState<boolean>(false);
+  const [runInBackground, setRunInBackground] = useState<boolean>(false);
 
-  // Refs para mantener vivos los estados dentro de listeners
   const autoSaveRef = useRef(autoSave);
   const autoLoadRef = useRef(autoLoad);
+  const runInBackgroundRef = useRef(runInBackground);
   const fieldsRef = useRef(fields);
   const urlRef = useRef<string | null>(null);
+  const previousFieldsSignatureRef = useRef<string>("");
 
-  // 💾 Recuperar preferencias de almacenamiento local y setear defaults
   useEffect(() => {
-    chrome.storage.local.get(["autoSavePref", "autoLoadPref"], (res) => {
+    chrome.storage.local.get(["autoSavePref", "autoLoadPref", "runInBackgroundPref"], (res) => {
       if (res.autoSavePref !== undefined) setAutoSave(res.autoSavePref);
       if (res.autoLoadPref !== undefined) setAutoLoad(res.autoLoadPref);
+      if (res.runInBackgroundPref !== undefined) setRunInBackground(res.runInBackgroundPref);
     });
   }, []);
 
-  // Funciones de Guardado persistente de Preferencias
   const toggleAutoSave = () => {
     const val = !autoSave;
     setAutoSave(val);
@@ -36,19 +38,25 @@ export default function App() {
     chrome.storage.local.set({ autoLoadPref: val });
   };
 
+  const toggleRunInBackground = () => {
+    const val = !runInBackground;
+    setRunInBackground(val);
+    chrome.storage.local.set({ runInBackgroundPref: val });
+  };
+
   useEffect(() => { autoSaveRef.current = autoSave; }, [autoSave]);
   useEffect(() => { autoLoadRef.current = autoLoad; }, [autoLoad]);
+  useEffect(() => { runInBackgroundRef.current = runInBackground; }, [runInBackground]);
   useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
   const scan = () => {
     chrome.tabs.query({ active: true }, (tabs) => {
       const tab = tabs.find(t => t.url && !t.url.startsWith("chrome-extension://"));
-
-      // Validar si la URL ha cambiado constantemente (Soporta SPA y Views en React/Angular)
+      
       if (tab?.url) {
         if (autoLoadRef.current && urlRef.current !== null && tab.url !== urlRef.current) {
           urlRef.current = tab.url;
-          setTimeout(() => loadFields(), 1500);
+          if (!runInBackgroundRef.current) setTimeout(() => loadFields(), 800);
         } else if (!urlRef.current) {
           urlRef.current = tab.url;
         }
@@ -57,7 +65,21 @@ export default function App() {
       if (tab?.id) {
         chrome.tabs.sendMessage(tab.id, { action: "GET_FIELDS" }, (res: any) => {
           if (chrome.runtime.lastError) return;
-          if (res) setFields(res);
+          if (res) {
+            setFields(res);
+
+            // Vigía de Mutaciones DOM Reales (El mejor detector de SPAs, Modales y Angular)
+            const signature = res.map((f: any) => f.input.id || f.input.name || f.input.className).join(",");
+            if (signature !== previousFieldsSignatureRef.current) {
+              const inicial = previousFieldsSignatureRef.current === "";
+              previousFieldsSignatureRef.current = signature;
+              
+              if (!inicial && autoLoadRef.current && res.length > 0 && !runInBackgroundRef.current) {
+                // Inyección inmediata (sin delay) porque los inputs ya existen genuinamente
+                loadFields();
+              }
+            }
+          }
         });
       }
     });
@@ -65,7 +87,7 @@ export default function App() {
 
   const renderField = (field: any, index: number) => {
     const inputClasses = "w-full px-3 py-2 border border-slate-800 bg-slate-950 text-slate-100 placeholder-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm";
-
+    
     if (field.input.type === "text" || field.input.type === "tel" || field.input.type === "number" || field.input.type === "email" || field.input.type === "password" || field.input.type === "url") {
       return (
         <div className="flex flex-col gap-2">
@@ -109,25 +131,20 @@ export default function App() {
     const interval = setInterval(() => {
       scan();
       tick++;
-
-      // Guardado automático cada 5 segundos
-      if (autoSaveRef.current && tick % 5 === 0) {
+      if (autoSaveRef.current && tick % 3 === 0) {
         if (fieldsRef.current.length > 0) {
           saveFields(fieldsRef.current);
         }
       }
-
     }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // 🌐 Protector Nativo para F5 / Actualizaciones de Pantalla misceláneas
   useEffect(() => {
     const handleTabUpdate = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
-      // Reacciona y Lanza Autocompletado CUALQUIER VEZ QUE SE ACTUALICE LA PÁGINA O PULSEN F5 
       if (changeInfo.status === "complete" && tab.active) {
-        if (autoLoadRef.current) {
-          setTimeout(() => loadFields(), 1500); 
+        if (autoLoadRef.current && !runInBackgroundRef.current) {
+          setTimeout(() => loadFields(), 800); 
         }
       }
     };
@@ -135,6 +152,42 @@ export default function App() {
     return () => chrome.tabs.onUpdated.removeListener(handleTabUpdate);
   }, []);
 
+  // VISTA DE CONFIGURACIONES
+  if (view === "settings") {
+    return (
+      <div className="w-screen min-h-screen bg-slate-950 text-slate-100 p-5 font-sans relative">
+        <button onClick={() => setView("main")} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span className="font-medium text-sm">Volver</span>
+        </button>
+
+        <h2 className="text-lg font-bold text-slate-200 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
+          <svg className="w-5 h-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Configuración Avanzada
+        </h2>
+
+        <div className="flex flex-col gap-3">
+          <label className={`flex items-center justify-between px-4 py-4 border rounded-xl cursor-pointer transition-all duration-200 group ${runInBackground ? 'border-amber-500/50 bg-amber-500/5 hover:bg-amber-500/10' : 'border-slate-800 bg-slate-900 hover:bg-slate-800/80 shadow-md'}`}>
+            <div className="flex flex-col pr-4">
+              <span className={`text-sm font-semibold transition-colors ${runInBackground ? 'text-amber-400' : 'text-slate-300'}`}>Ejecutar de Fondo</span>
+              <span className="text-xs text-slate-500 mt-1">Mantiene el recolector y cargador en Background aunque cierres el panel. (Worker Mode)</span>
+            </div>
+            <div className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out flex flex-shrink-0 items-center ${runInBackground ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]' : 'bg-slate-800 border-2 border-slate-700'}`}>
+              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${runInBackground ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <input type="checkbox" className="hidden" checked={runInBackground} onChange={toggleRunInBackground} />
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  // VISTA PRINCIPAL
   return (
     <div className="w-screen min-h-screen bg-slate-950 text-slate-100 p-5 font-sans pb-10">
       <div className="flex items-center justify-between mb-4">
@@ -144,9 +197,12 @@ export default function App() {
 
         <div className="flex items-center gap-1.5">
           <button
+            onClick={() => setView("settings")}
             title="Configuración"
-            className="p-2 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg shadow-inner transition-all duration-200 group"
+            className="p-2 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg shadow-inner transition-all duration-200 group relative"
           >
+            {/* Pequeño punto indicador si RunInBackground está activo */}
+            {runInBackground && <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(245,158,11,0.5)]"></span>}
             <svg className="w-4 h-4 group-hover:rotate-45 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -166,7 +222,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* 📊 Indicador de Datos Guardados Globales */}
       <div className="flex justify-between items-center bg-slate-900/60 border border-slate-800/80 px-4 py-3 rounded-xl mb-4 backdrop-blur-md shadow-lg shadow-black/20">
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -181,7 +236,6 @@ export default function App() {
       </div>
 
       <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/80 rounded-xl overflow-hidden shadow-xl">
-        {/* Cabecera / Trigger del Acordeón */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-800/40 transition-colors duration-200 border-b border-slate-800/50"
@@ -197,7 +251,6 @@ export default function App() {
           </svg>
         </button>
 
-        {/* Contenido Colapsable */}
         <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[300px] overflow-y-auto p-4 flex flex-col gap-3' : 'max-h-0 overflow-hidden'}`}>
           {fields.map((field, index) => (
             <div key={index} className="flex flex-col gap-1">
@@ -247,7 +300,7 @@ export default function App() {
         <label className={`flex items-center justify-between px-4 py-3 border rounded-xl cursor-pointer transition-all duration-200 group ${autoLoad ? 'border-violet-500/50 bg-violet-500/5 hover:bg-violet-500/10' : 'border-slate-800 bg-slate-900 hover:bg-slate-800/80 shadow-md'}`}>
           <div className="flex flex-col">
             <span className={`text-sm font-semibold transition-colors ${autoLoad ? 'text-violet-400' : 'text-slate-300'}`}>Cargar Automáticamente</span>
-            <span className="text-xs text-slate-500">Al interactuar y cambiar la página</span>
+            <span className="text-xs text-slate-500">Al cambiar de página o navegar</span>
           </div>
           <div className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out flex flex-shrink-0 items-center ${autoLoad ? 'bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'bg-slate-800 border-2 border-slate-700'}`}>
             <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${autoLoad ? 'translate-x-4' : 'translate-x-0'}`} />

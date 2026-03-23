@@ -101,76 +101,97 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const fields = getFields();
     sendResponse(fields);
   } else if (message.action === "FILL_FIELDS") {
-    const data = message.data || [];
-    const fillSequentially = async () => {
-      const usedElements = /* @__PURE__ */ new Set();
-      for (const savedField of data) {
-        const targetLabel = savedField.label.text;
-        const targetMethod = savedField.label.method;
-        const valueToSet = savedField.input.value;
-        let current = null;
-        if (targetMethod === "xpath") {
-          try {
-            let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
-            const result = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-            const xpathNode = result.singleNodeValue;
-            if (xpathNode && !usedElements.has(xpathNode)) {
-              current = xpathNode;
-            }
-          } catch (e) {
-            console.warn("Fallback primario de XPath falló:", e);
-          }
-        }
-        if (!current) {
-          let highestScore = 0;
-          const allInputs = document.querySelectorAll("input, select, textarea");
-          const candidates = Array.from(allInputs);
-          const isFuzzyMatch = (a, b) => {
-            if (!a || !b) return false;
-            const normalize = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_\-]+/g, "");
-            return normalize(a) === normalize(b);
-          };
-          for (let i = 0; i < candidates.length; i++) {
-            const candidate = candidates[i];
-            if (candidate.type === "file") continue;
-            if (usedElements.has(candidate)) continue;
-            let score = 0;
-            if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
-            if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
-            if (savedField.input.id && isFuzzyMatch(candidate.id, savedField.input.id)) score += 80;
-            if (savedField.input.name && isFuzzyMatch(candidate.name, savedField.input.name)) score += 70;
-            if (targetMethod === "placeholder" && isFuzzyMatch(candidate.placeholder, targetLabel)) score += 60;
-            if (targetMethod === "id" && isFuzzyMatch(candidate.id, targetLabel)) score += 60;
-            if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
-            if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
-            if (savedField.input.domIndex !== void 0 && i === savedField.input.domIndex) score += 5;
-            if (candidate.tagName === "SELECT" && savedField.input.options) {
-              const candidateOptions = Array.from(candidate.querySelectorAll("option")).map((o) => o.textContent?.trim());
-              const savedOptions = savedField.input.options.map((o) => o.text);
-              if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
-                score += 30;
-              }
-            }
-            if (score > highestScore && score >= 30) {
-              highestScore = score;
-              current = candidate;
-            }
-          }
-        }
-        if (current) {
-          console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
-          usedElements.add(current);
-          fillElementValue(current, valueToSet);
-          await new Promise((r) => setTimeout(r, 100));
-        } else {
-          console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
-        }
-      }
-      sendResponse({ success: true, message: "Campos rellenados" });
-    };
-    fillSequentially();
+    fillSequentially(message.data || []);
+    sendResponse({ success: true, message: "Campos rellenados" });
     return true;
   }
   return true;
 });
+const fillSequentially = async (data) => {
+  const usedElements = /* @__PURE__ */ new Set();
+  for (const savedField of data) {
+    const targetLabel = savedField.label.text;
+    const targetMethod = savedField.label.method;
+    const valueToSet = savedField.input.value;
+    let current = null;
+    if (targetMethod === "xpath") {
+      try {
+        let cleanXpath = targetLabel.replace(/^XPath\(/, "").replace(/\)$/, "");
+        const result = document.evaluate(cleanXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const xpathNode = result.singleNodeValue;
+        if (xpathNode && !usedElements.has(xpathNode)) {
+          current = xpathNode;
+        }
+      } catch (e) {
+        console.warn("Fallback primario de XPath falló:", e);
+      }
+    }
+    if (!current) {
+      let highestScore = 0;
+      const allInputs = document.querySelectorAll("input, select, textarea");
+      const candidates = Array.from(allInputs);
+      const isFuzzyMatch = (a, b) => {
+        if (!a || !b) return false;
+        const normalize = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[\s_\-]+/g, "");
+        return normalize(a) === normalize(b);
+      };
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        if (candidate.type === "file") continue;
+        if (usedElements.has(candidate)) continue;
+        let score = 0;
+        if (savedField.input.id && candidate.id === savedField.input.id) score += 100;
+        if (savedField.input.name && candidate.name === savedField.input.name) score += 90;
+        if (savedField.input.id && isFuzzyMatch(candidate.id, savedField.input.id)) score += 80;
+        if (savedField.input.name && isFuzzyMatch(candidate.name, savedField.input.name)) score += 70;
+        if (targetMethod === "placeholder" && isFuzzyMatch(candidate.placeholder, targetLabel)) score += 60;
+        if (targetMethod === "id" && isFuzzyMatch(candidate.id, targetLabel)) score += 60;
+        if (savedField.input.type && candidate.type === savedField.input.type) score += 10;
+        if (savedField.input.className && candidate.className === savedField.input.className) score += 20;
+        if (savedField.input.domIndex !== void 0 && i === savedField.input.domIndex) score += 5;
+        if (candidate.tagName === "SELECT" && savedField.input.options) {
+          const candidateOptions = Array.from(candidate.querySelectorAll("option")).map((o) => o.textContent?.trim());
+          const savedOptions = savedField.input.options.map((o) => o.text);
+          if (JSON.stringify(candidateOptions) === JSON.stringify(savedOptions)) {
+            score += 30;
+          }
+        }
+        if (score > highestScore && score >= 30) {
+          highestScore = score;
+          current = candidate;
+        }
+      }
+    }
+    if (current) {
+      console.log(`-> Rellenando ${current.tagName} (${targetLabel}) con:`, valueToSet);
+      usedElements.add(current);
+      fillElementValue(current, valueToSet);
+      await new Promise((r) => setTimeout(r, 5));
+    } else {
+      console.warn(`-> No se encontró match libre para: ${targetLabel} (Método: ${targetMethod})`);
+    }
+  }
+};
+let lastContentSignature = "";
+setInterval(() => {
+  chrome.storage.local.get(["autoLoadPref", "runInBackgroundPref", "fields"], (res) => {
+    if (!res.runInBackgroundPref) return;
+    if (res.autoLoadPref && res.fields && res.fields.length > 5) {
+      const currentInputs = Array.from(document.querySelectorAll("input, select, textarea"));
+      if (currentInputs.length === 0) return;
+      const sig = currentInputs.map((e) => e.id || e.name || e.className || e.type).join(",");
+      if (sig !== lastContentSignature) {
+        const inicial = lastContentSignature === "";
+        lastContentSignature = sig;
+        if (!inicial) {
+          try {
+            const parsed = JSON.parse(res.fields);
+            fillSequentially(parsed);
+          } catch (e) {
+          }
+        }
+      }
+    }
+  });
+}, 1e3);
 export {};
