@@ -1,9 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Hook para guardar campos en chrome storage con feedback de estado
 export const useSaveFields = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [success, setSuccess] = useState<boolean>(false);
+    const [savedCount, setSavedCount] = useState<number>(0);
+
+    // Efecto para mantener sincronizado el contador de la base de datos
+    useEffect(() => {
+        const fetchCount = () => {
+            chrome.storage.local.get(["fields"], (result) => {
+                if (result.fields) {
+                    try {
+                        const parsed = JSON.parse(result.fields);
+                        setSavedCount(parsed.length);
+                    } catch { setSavedCount(0); }
+                } else setSavedCount(0);
+            });
+        };
+
+        fetchCount();
+        const changeListener = (changes: any, namespace: string) => {
+            if (namespace === "local" && changes.fields) fetchCount();
+        };
+        chrome.storage.onChanged.addListener(changeListener);
+
+        return () => chrome.storage.onChanged.removeListener(changeListener);
+    }, []);
 
     const saveFields = (fields: any[]) => {
         setLoading(true);
@@ -112,5 +135,5 @@ export const useSaveFields = () => {
         });
     };
 
-    return { saveFields, loading, success, loadFields, clearFields };
+    return { saveFields, loading, success, loadFields, clearFields, savedCount };
 };
