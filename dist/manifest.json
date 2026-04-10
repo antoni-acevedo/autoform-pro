@@ -20,12 +20,11 @@
   },
   "content_scripts": [
     {
+      "js": [
+        "assets/content.ts-DIxpNRsk.js"
+      ],
       "matches": [
         "<all_urls>"
-      ],
-      "js": [
-        "vendor/crx-content-css-0-loader.js",
-        "src/content.ts-loader.js"
       ],
       "css": [
         "src/content.css"
@@ -44,8 +43,7 @@
         "<all_urls>"
       ],
       "resources": [
-        "**/*",
-        "*"
+        "assets/content.ts-DIxpNRsk.js"
       ],
       "use_dynamic_url": false
     }
